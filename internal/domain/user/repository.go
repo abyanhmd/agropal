@@ -1,21 +1,23 @@
 package user
 
 import (
-	dNote "agropal/internal/domain/note"
+	"agropal/internal/database"
 	"agropal/internal/domain/shared"
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 type Repository interface {
-	Create(ctx context.Context, user User) error
-	GetOne(ctx context.Context, userID uuid.UUID) (User, error)
-	Update(ctx context.Context, user User) error
-	UpdatePassword(ctx context.Context, userID uuid.UUID, password string) error
+	Create(ctx context.Context, q database.Querier, user User) error
+	FindByID(ctx context.Context, q database.Querier, userID uuid.UUID) (User, error)
+	List(ctx context.Context, q database.Querier) ([]User, error)
+	Update(ctx context.Context, q database.Querier, user User) error
+	UpdatePassword(ctx context.Context, q database.Querier, userID uuid.UUID, password string) error
 
-	SoftDelete(ctx context.Context, deleteNote dNote.Note) error
-	HardDelete(ctx context.Context, userID uuid.UUID, deleteNote dNote.Note) error
+	SoftDelete(ctx context.Context, q database.Querier, userID uuid.UUID, deletedAt time.Time) error
+	Delete(ctx context.Context, q database.Querier, userID uuid.UUID) error
 
-	GetByAdmin(ctx context.Context, assetType shared.AssetType, assetID uuid.UUID) ([]User, error)
+	ListByAsset(ctx context.Context, q database.Querier, assetType shared.AssetType, assetID uuid.UUID) ([]User, error)
 }

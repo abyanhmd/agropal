@@ -13,7 +13,7 @@ type ProductDetail struct {
 }
 
 type Product struct {
-	ProductID   uuid.UUID
+	ID          uuid.UUID
 	Name        string
 	Description string
 	Image       string
@@ -21,23 +21,23 @@ type Product struct {
 }
 
 type ProductStock struct {
-	StockID   uuid.UUID
+	ID        uuid.UUID
 	ProductID uuid.UUID
 	DateAdded time.Time
-	Type      StockType
+	Type      StockMovementType
 	Stock     float64
 }
 
 type ProductPrice struct {
-	PriceID   uuid.UUID
+	ID        uuid.UUID
 	ProductID uuid.UUID
 	DateAdded time.Time
 	Price     float64
 }
 
-type StockType string
+type StockMovementType string
 
 const (
-	StockTypeIn  StockType = "in"
-	StockTypeOut StockType = "out"
+	MovementIn  StockMovementType = "IN"
+	MovementOut StockMovementType = "OUT"
 )

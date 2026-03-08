@@ -4,8 +4,8 @@ import (
 	"github.com/google/uuid"
 )
 
-type ModelFarm struct {
-	FarmID uuid.UUID `db:"farm_id"`
-	UserID uuid.UUID `db:"user_id"`
+type FarmModel struct {
+	ID     uuid.UUID `db:"farm_id"`
 	Name   string    `db:"name"`
+	UserID uuid.UUID `db:"user_id"`
 }

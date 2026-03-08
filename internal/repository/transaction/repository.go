@@ -1,99 +1,99 @@
 package transaction
 
 import (
+	"agropal/internal/database"
 	"agropal/internal/domain/shared"
 	dTransaction "agropal/internal/domain/transaction"
 	"agropal/internal/utils"
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 )
 
 type RepositoryImpl struct {
-	DB     *sqlx.DB
 	Logger *utils.Logger
 }
 
-func (r *RepositoryImpl) Create(ctx context.Context, transaction dTransaction.Transaction) error {
-	insertQuery := `INSERT INTO transactions (
-		transaction_id, date, type,
-		amount, description, product_id
-	) VALUES (
-		:transaction_id, :date, :type,
-		:amount, :description, :product_id
-	);`
+func NewRepository(logger *utils.Logger) dTransaction.Repository {
+	return &RepositoryImpl{Logger: logger}
+}
 
-	modelTransaction := DomainToModelTransaction(transaction)
-	if _, errInsert := r.DB.NamedExecContext(ctx, insertQuery, modelTransaction); errInsert != nil {
-		r.Logger.Error(ctx, shared.AssetTransaction, errInsert.Error())
-		return errInsert
+func (r *RepositoryImpl) Create(ctx context.Context, q database.Querier, t dTransaction.Transaction) error {
+	query := `
+		INSERT INTO transactions (
+			transaction_id, date, type,
+			amount, currency, description,
+			product_id
+		) VALUES (
+			:transaction_id, :date, :type,
+			:amount, :currency, :description,
+			:product_id
+		);`
+
+	transactionModel := ToTransactionModel(t)
+	if _, err := q.NamedExecContext(ctx, query, transactionModel); err != nil {
+		r.Logger.Error(ctx, shared.AssetTransaction, err.Error())
+		return err
 	}
 
 	return nil
 }
 
-func (r *RepositoryImpl) GetOne(ctx context.Context, transactionID uuid.UUID) (dTransaction.Transaction, error) {
+func (r *RepositoryImpl) FindByID(ctx context.Context, q database.Querier, id uuid.UUID) (dTransaction.Transaction, error) {
 	getQuery := `SELECT * FROM transactions WHERE transaction_id = $1;`
 
-	var modelTransaction ModelTransaction
-	if errGet := r.DB.GetContext(ctx, &modelTransaction, getQuery, transactionID); errGet != nil {
-		r.Logger.Error(ctx, shared.AssetTransaction, errGet.Error())
-		return dTransaction.Transaction{}, errGet
+	var transactionModel TransactionModel
+	if err := q.GetContext(ctx, &transactionModel, getQuery, id); err != nil {
+		r.Logger.Error(ctx, shared.AssetTransaction, err.Error())
+		return dTransaction.Transaction{}, err
 	}
 
-	return modelTransaction.ToDomain(), nil
+	return transactionModel.ToDomain(), nil
 }
 
-func (r *RepositoryImpl) GetMany(ctx context.Context, farmID uuid.UUID) ([]dTransaction.Transaction, error) {
-	getQuery := `SELECT * FROM transactions WHERE farm_id = $1;`
+func (r *RepositoryImpl) ListByFarmID(ctx context.Context, q database.Querier, farmID uuid.UUID) ([]dTransaction.Transaction, error) {
+	query := `SELECT * FROM transactions WHERE farm_id = $1;`
 
-	var modelTransactions []ModelTransaction
-	if errSelect := r.DB.SelectContext(ctx, &modelTransactions, getQuery, farmID); errSelect != nil {
-		r.Logger.Error(ctx, shared.AssetTransaction, errSelect.Error())
-		return nil, errSelect
+	var transactionModels []TransactionModel
+	if err := q.SelectContext(ctx, &transactionModels, query, farmID); err != nil {
+		r.Logger.Error(ctx, shared.AssetTransaction, err.Error())
+		return nil, err
 	}
 
-	transactions := make([]dTransaction.Transaction, len(modelTransactions))
-	for i, m := range modelTransactions {
+	transactions := make([]dTransaction.Transaction, len(transactionModels))
+	for i, m := range transactionModels {
 		transactions[i] = m.ToDomain()
 	}
 
 	return transactions, nil
 }
 
-func (r *RepositoryImpl) Update(ctx context.Context, transaction dTransaction.Transaction) error {
-	updateQuery := `UPDATE transactions 
+func (r *RepositoryImpl) Update(ctx context.Context, q database.Querier, t dTransaction.Transaction) error {
+	query := `UPDATE transactions 
 		SET date = :date, 
 		    type = :type, 
 		    amount = :amount, 
+		    currency = :currency,
 		    description = :description, 
 		    product_id = :product_id 
 		WHERE transaction_id = :transaction_id;`
 
-	modelTransaction := DomainToModelTransaction(transaction)
-	if _, errUpdate := r.DB.NamedExecContext(ctx, updateQuery, modelTransaction); errUpdate != nil {
-		r.Logger.Error(ctx, shared.AssetTransaction, errUpdate.Error())
-		return errUpdate
+	transactionModel := ToTransactionModel(t)
+	if _, err := q.NamedExecContext(ctx, query, transactionModel); err != nil {
+		r.Logger.Error(ctx, shared.AssetTransaction, err.Error())
+		return err
 	}
 
 	return nil
 }
 
-func (r *RepositoryImpl) Delete(ctx context.Context, transactionID uuid.UUID) error {
-	deleteQuery := `DELETE FROM transactions WHERE transaction_id = $1;`
+func (r *RepositoryImpl) Delete(ctx context.Context, q database.Querier, id uuid.UUID) error {
+	query := `DELETE FROM transactions WHERE transaction_id = $1;`
 
-	if _, errDelete := r.DB.ExecContext(ctx, deleteQuery, transactionID); errDelete != nil {
-		r.Logger.Error(ctx, shared.AssetTransaction, errDelete.Error())
-		return errDelete
+	if _, err := q.ExecContext(ctx, query, id); err != nil {
+		r.Logger.Error(ctx, shared.AssetTransaction, err.Error())
+		return err
 	}
 
 	return nil
-}
-
-func NewRepository(db *sqlx.DB, logger *utils.Logger) dTransaction.Repository {
-	return &RepositoryImpl{
-		DB:     db,
-		Logger: logger,
-	}
 }

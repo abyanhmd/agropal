@@ -5,22 +5,30 @@ import (
 	"agropal/internal/domain/shared"
 )
 
-func DomainToModelNote(domain dNote.Note) ModelNote {
-	return ModelNote{
-		NoteID:    domain.NoteID,
-		DateAdded: domain.DateAdded,
-		NoteType:  string(domain.NoteType),
-		AssetType: string(domain.AssetType),
-		AssetID:   domain.AssetID,
+func ToNoteModel(domain dNote.Note) NoteModel {
+	return NoteModel{
+		ID:          domain.ID,
+		CreatedAt:   domain.CreatedAt,
+		Type:        string(domain.Type),
+		AssetType:   string(domain.AssetType),
+		AssetID:     domain.AssetID,
+		Field:       domain.Field,
+		AuthorID:    domain.AuthorID,
+		AuthorName:  domain.AuthorName,
+		IsSystemLog: domain.IsSystemLog,
 	}
 }
 
-func (n ModelNote) ToDomain() dNote.Note {
+func (n NoteModel) ToDomain() dNote.Note {
 	return dNote.Note{
-		NoteID:    n.NoteID,
-		DateAdded: n.DateAdded,
-		NoteType:  dNote.NoteType(n.NoteType),
-		AssetType: shared.AssetType(n.AssetType),
-		AssetID:   n.AssetID,
+		ID:          n.ID,
+		CreatedAt:   n.CreatedAt,
+		Type:        dNote.NoteType(n.Type),
+		AssetType:   shared.AssetType(n.AssetType),
+		AssetID:     n.AssetID,
+		Field:       n.Field,
+		AuthorID:    n.AuthorID,
+		AuthorName:  n.AuthorName,
+		IsSystemLog: n.IsSystemLog,
 	}
 }

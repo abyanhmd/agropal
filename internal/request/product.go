@@ -33,7 +33,7 @@ func (p *ProductStockRequest) ToCommand(productID uuid.UUID) aProduct.ProductSto
 	return aProduct.ProductStockCommand{
 		ProductID: productID,
 		DateAdded: p.DateAdded,
-		Type:      dProduct.StockType(p.Type),
+		Type:      dProduct.StockMovementType(p.Type),
 		Stock:     p.Stock,
 	}
 }

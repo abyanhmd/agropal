@@ -17,7 +17,7 @@ type ProductCommand struct {
 type ProductStockCommand struct {
 	ProductID uuid.UUID
 	DateAdded time.Time
-	Type      dProduct.StockType
+	Type      dProduct.StockMovementType
 	Stock     float64
 }
 
@@ -29,7 +29,7 @@ type ProductPriceCommand struct {
 
 func (c ProductCommand) ToDomain(productID uuid.UUID) dProduct.Product {
 	return dProduct.Product{
-		ProductID:   productID,
+		ID:          productID,
 		Name:        c.Name,
 		Description: c.Description,
 		Image:       c.Image,
@@ -39,7 +39,7 @@ func (c ProductCommand) ToDomain(productID uuid.UUID) dProduct.Product {
 
 func (c ProductStockCommand) ToDomain(productID, stockID uuid.UUID) dProduct.ProductStock {
 	return dProduct.ProductStock{
-		StockID:   stockID,
+		ID:        stockID,
 		ProductID: productID,
 		DateAdded: c.DateAdded,
 		Type:      c.Type,
@@ -49,7 +49,7 @@ func (c ProductStockCommand) ToDomain(productID, stockID uuid.UUID) dProduct.Pro
 
 func (c ProductPriceCommand) ToDomain(productID, priceID uuid.UUID) dProduct.ProductPrice {
 	return dProduct.ProductPrice{
-		PriceID:   priceID,
+		ID:        priceID,
 		ProductID: productID,
 		DateAdded: c.DateAdded,
 		Price:     c.Price,

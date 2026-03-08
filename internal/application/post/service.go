@@ -20,7 +20,7 @@ func NewService(postRepository dPost.Repository) Service {
 }
 
 func (s *Service) CreatePost(ctx context.Context, cmd PostCommand) error {
-	userID, errParse := utils.GetUserIDFromContext(ctx)
+	userID, errParse := utils.ExtractUserID(ctx)
 	if errParse != nil {
 		return errParse
 	}
@@ -30,10 +30,10 @@ func (s *Service) CreatePost(ctx context.Context, cmd PostCommand) error {
 	if errGen != nil {
 		return errGen
 	}
-	post.PostID = postID
-	post.Like = 0
-	post.Dislike = 0
-	post.View = 0
+	post.ID = postID
+	post.LikeCount = 0
+	post.DislikeCount = 0
+	post.ViewCount = 0
 
 	// TODO: Validate post input
 
@@ -54,7 +54,7 @@ func (s *Service) GetManyPosts(ctx context.Context) ([]dPost.Post, error) {
 }
 
 func (s *Service) CreatePostComment(ctx context.Context, cmd PostCommentCommand) error {
-	userID, errParse := utils.GetUserIDFromContext(ctx)
+	userID, errParse := utils.ExtractUserID(ctx)
 	if errParse != nil {
 		return errParse
 	}
@@ -79,7 +79,7 @@ func (s *Service) GetPostComments(ctx context.Context, postIDStr string) ([]dPos
 }
 
 func (s *Service) CreatePostEngagement(ctx context.Context, engagementTypeStr, postIDStr string) error {
-	userID, errParse := utils.GetUserIDFromContext(ctx)
+	userID, errParse := utils.ExtractUserID(ctx)
 	if errParse != nil {
 		return errParse
 	}
@@ -88,20 +88,20 @@ func (s *Service) CreatePostEngagement(ctx context.Context, engagementTypeStr, p
 	if errParse != nil {
 		return errParse
 	}
-	var engagementType dPost.EngagementType
+	var engagementType dPost.ActionType
 	switch engagementTypeStr {
 	case "post_like":
-		engagementType = dPost.EngagementPostLike
+		engagementType = dPost.ActionLike
 	case "post_dislike":
-		engagementType = dPost.EngagementPostDislike
+		engagementType = dPost.ActionDislike
 	case "post_view":
-		engagementType = dPost.EngagementPostView
+		engagementType = dPost.ActionView
 	case "post_comment_like":
-		engagementType = dPost.EngagementPostCommentLike
+		engagementType = dPost.EngagementCommentLike
 	case "post_comment_dislike":
-		engagementType = dPost.EngagementPostCommentDislike
+		engagementType = dPost.EngagementCommentDislike
 	case "post_comment_view":
-		engagementType = dPost.EngagementPostCommentView
+		engagementType = dPost.EngagementCommentSeen
 	default:
 		return errors.New("invalid engagement type")
 	}
@@ -112,9 +112,9 @@ func (s *Service) CreatePostEngagement(ctx context.Context, engagementTypeStr, p
 	}
 
 	return s.PostRepository.CreatePostEngagement(ctx, dPost.PostEngagement{
-		EngagementID: engagementID,
-		PostID:       postID,
-		UserID:       userID,
-		Type:         engagementType,
+		ID:     engagementID,
+		PostID: postID,
+		UserID: userID,
+		Type:   engagementType,
 	})
 }

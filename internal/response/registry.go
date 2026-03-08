@@ -2,13 +2,14 @@ package response
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
-	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 type ResponseDetail struct {
-	ID       string `json:"code"`
+	ResCode  string `json:"code"`
 	HTTPCode int    `json:"http_code"`
 	Message  string `json:"message"`
 }
@@ -18,6 +19,12 @@ type Registry map[string]map[string]ResponseDetail
 type ResponseRegistry struct {
 	Errors    Registry
 	Successes Registry
+}
+
+type ErrorKey string
+
+func (e ErrorKey) Error() string {
+	return string(e)
 }
 
 func NewResponseRegistry(
@@ -48,24 +55,21 @@ func LoadRegistries(errorPath, successPath string) (*ResponseRegistry, error) {
 }
 
 func loadFile(path string) (Registry, error) {
-	v := viper.New()
-	v.SetConfigFile(path)
-	v.SetConfigType("yaml")
-
-	if err := v.ReadInConfig(); err != nil {
+	data, err := os.ReadFile(path)
+	if err != nil {
 		return nil, err
 	}
 
 	var reg Registry
-	if err := v.Unmarshal(&reg); err != nil {
+	if err := yaml.Unmarshal(data, &reg); err != nil {
 		return nil, err
 	}
 
 	return reg, nil
 }
 
-func (r *ResponseRegistry) GetErrorRegistry(key string) (ResponseDetail, bool) {
-	return r.lookup(r.Errors, key)
+func (r *ResponseRegistry) GetErrorRegistry(key error) (ResponseDetail, bool) {
+	return r.lookup(r.Errors, key.Error())
 }
 
 func (r *ResponseRegistry) GetSuccessRegistry(key string) (ResponseDetail, bool) {
@@ -78,7 +82,7 @@ func (r *ResponseRegistry) lookup(reg Registry, key string) (ResponseDetail, boo
 		return ResponseDetail{}, false
 	}
 
-	category := strings.ToLower(parts[0])
+	category := strings.ToUpper(parts[0])
 	name := strings.ToUpper(parts[1])
 
 	if group, ok := reg[category]; ok {

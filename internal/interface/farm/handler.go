@@ -34,7 +34,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := utils.GetUserIDFromContext(ctx)
+	userID, err := utils.ExtractUserID(ctx)
 	if err != nil {
 		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
 		return

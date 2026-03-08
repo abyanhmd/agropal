@@ -7,17 +7,18 @@ import (
 )
 
 type Transaction struct {
-	TransactionID uuid.UUID
-	Date          time.Time
-	Type          TransactionType
-	Amount        float64
-	Description   string
-	ProductID     uuid.UUID
+	ID          uuid.UUID
+	Date        time.Time
+	Type        TransactionType
+	Amount      float64
+	Currency    string
+	Description string
+	ProductID   uuid.UUID
 }
 
 type TransactionType string
 
 const (
-	TransactionTypeIncome  TransactionType = "income"
-	TransactionTypeExpense TransactionType = "expense"
+	TypeIncome  TransactionType = "INCOME"
+	TypeExpense TransactionType = "EXPENSE"
 )

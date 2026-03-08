@@ -8,19 +8,23 @@ import (
 )
 
 type Note struct {
-	NoteID    uuid.UUID
-	DateAdded time.Time
-	NoteType  NoteType
-	AssetType shared.AssetType
-	AssetID   uuid.UUID
+	ID          uuid.UUID
+	CreatedAt   time.Time
+	Type        NoteType
+	AssetType   shared.AssetType
+	AssetID     uuid.UUID
+	Field       string
+	AuthorID    uuid.UUID
+	AuthorName  string
+	IsSystemLog bool
 }
 
 type NoteType string
 
 const (
-	NoteCreate     NoteType = "create"
-	NoteUpdate     NoteType = "update"
-	NoteSoftDelete NoteType = "soft_delete"
-	NoteHardDelete NoteType = "hard_delete"
-	NoteMerge      NoteType = "merge"
+	NoteCreate     NoteType = "CREATE"
+	NoteUpdate     NoteType = "UPDATE"
+	NoteSoftDelete NoteType = "SOFT_DELETE"
+	NoteHardDelete NoteType = "HARD_DELETE"
+	NoteMerge      NoteType = "MERGE"
 )

@@ -25,11 +25,19 @@ func NewIOHandler(
 	}
 }
 
-type StandardEnvelope[T any] struct {
-	Code      string `json:"code"`
-	Message   string `json:"message"`
-	Data      T      `json:"data,omitempty"`
-	RequestID string `json:"request_id,omitempty"`
+type InfoEnvelope struct {
+	Code    string `json:"code"`
+	Key     string `json:"key"`
+	Message string `json:"message"`
+}
+
+type ValidationErrors map[string][]string
+
+type StandardEnvelope struct {
+	Info      InfoEnvelope     `json:"info"`
+	Data      any              `json:"data,omitempty"`
+	Errors    ValidationErrors `json:"errors,omitempty"`
+	RequestID string           `json:"request_id,omitempty"`
 }
 
 func (io *IOHandler) ReadRequestBody(r *http.Request, result interface{}) error {
@@ -67,26 +75,32 @@ func (io *IOHandler) WriteSuccess(ctx context.Context, w http.ResponseWriter, ke
 		return
 	}
 
-	io.respond(ctx, w, detail.HTTPCode, StandardEnvelope[any]{
-		Code:    detail.ID,
-		Message: detail.Message,
-		Data:    data,
+	io.respond(ctx, w, detail.HTTPCode, StandardEnvelope{
+		Info: InfoEnvelope{
+			Code:    detail.ResCode,
+			Key:     key,
+			Message: detail.Message,
+		},
+		Data: data,
 	})
 }
 
 // WriteError ensures that errors are logged before being sent to the client
-func (io *IOHandler) WriteError(ctx context.Context, w http.ResponseWriter, key string, internalErr error) {
+func (io *IOHandler) WriteError(ctx context.Context, w http.ResponseWriter, key error, errorFields ValidationErrors) {
 	detail, ok := io.Registry.GetErrorRegistry(key)
 	if !ok {
-		detail = response.ResponseDetail{ID: "INTERNAL_ERROR", HTTPCode: 500, Message: "An unexpected error occurred"}
+		detail = response.ResponseDetail{ResCode: "INTERNAL_ERROR", HTTPCode: 500, Message: "An unexpected error occurred"}
 	}
 
 	requestID := GetMetadata(ctx, ContextRequestID)
 
-	io.Logger.Error(ctx, shared.System, internalErr.Error())
-	io.respond(ctx, w, detail.HTTPCode, StandardEnvelope[any]{
-		Code:      detail.ID,
-		Message:   detail.Message,
+	io.respond(ctx, w, detail.HTTPCode, StandardEnvelope{
+		Info: InfoEnvelope{
+			Code:    detail.ResCode,
+			Key:     key.Error(),
+			Message: detail.Message,
+		},
+		Errors:    errorFields,
 		RequestID: requestID,
 	})
 }
@@ -111,4 +125,33 @@ func (io *IOHandler) IdentifierFromPathValue(r *http.Request, key string) (uuid.
 	}
 
 	return id, nil
+}
+
+func (io *IOHandler) HandleServiceError(ctx context.Context, w http.ResponseWriter, errorKey error) {
+	var envelope StandardEnvelope
+
+	requestID := GetMetadata(ctx, ContextRequestID)
+
+	detail, ok := io.Registry.GetErrorRegistry(errorKey)
+	if !ok {
+		envelope = StandardEnvelope{
+			Info: InfoEnvelope{
+				Code:    "1002",
+				Key:     "INTERNAL_SERVER_ERROR",
+				Message: "An unexpected error occurred. Please try again later.",
+			},
+			RequestID: requestID,
+		}
+	} else {
+		envelope = StandardEnvelope{
+			Info: InfoEnvelope{
+				Code:    detail.ResCode,
+				Key:     errorKey.Error(),
+				Message: detail.Message,
+			},
+			RequestID: requestID,
+		}
+	}
+
+	io.respond(ctx, w, detail.HTTPCode, envelope)
 }

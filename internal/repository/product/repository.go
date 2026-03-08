@@ -1,251 +1,233 @@
 package product
 
 import (
+	"agropal/internal/database"
 	dProduct "agropal/internal/domain/product"
 	"agropal/internal/domain/shared"
 	"agropal/internal/utils"
 	"context"
-	"database/sql"
-	"errors"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 
+/* ==================== Create ====================== */
+
 type RepositoryImpl struct {
-	DB     *sqlx.DB
 	Logger *utils.Logger
 }
 
-/* ==================== Create ====================== */
+func NewRepository(logger *utils.Logger) dProduct.Repository {
+	return &RepositoryImpl{Logger: logger}
+}
 
-func (r *RepositoryImpl) CreateProduct(ctx context.Context, product dProduct.Product) error {
-	insertQuery := `INSERT INTO products (
-		product_id, name,
-		description, image,
-		farm_id
-	) VALUES (
-	  	:product_id, :name,
-		:description, :image,
-		:farm_id
-	);`
+func (r *RepositoryImpl) Create(ctx context.Context, q database.Querier, p dProduct.Product) error {
+	query := `
+		INSERT INTO products (
+			product_id, farm_id, name,
+			description, image
+		) VALUES (
+			:product_id, :farm_id, :name,
+			:description, :image
+		);`
 
-	modelProduct := DomainToModelProduct(product)
-	if _, errInsert := r.DB.NamedExecContext(ctx, insertQuery, modelProduct); errInsert != nil {
-		r.Logger.Error(ctx, shared.AssetProduct, errInsert.Error())
-		return errInsert
+	modelProduct := ToProductModel(p)
+	if _, err := q.NamedExecContext(ctx, query, modelProduct); err != nil {
+		r.Logger.Error(ctx, shared.AssetProduct, err.Error())
+		return err
 	}
 
 	return nil
 }
 
-func (r *RepositoryImpl) CreateProductStock(ctx context.Context, stock dProduct.ProductStock) error {
-	insertQuery := `INSERT INTO product_stocks (
-		stock_id, product_id, date_added, type, stock 
-	) VALUES (
-	    :stock_id, :product_id, :date_added, :type, :stock
-	);`
+func (r *RepositoryImpl) Update(ctx context.Context, q database.Querier, p dProduct.Product) error {
+	query := `
+		UPDATE products SET
+		    name = :name,
+		    description = :description,
+		    image = :image
+		WHERE product_id = :product_id;`
 
-	modelStock := DomainToModelStock(stock)
-	if _, errInsert := r.DB.ExecContext(ctx, insertQuery, modelStock); errInsert != nil {
-		r.Logger.Error(ctx, shared.AssetProduct, errInsert.Error())
-		return errInsert
+	modelProduct := ToProductModel(p)
+	if _, err := q.NamedExecContext(ctx, query, modelProduct); err != nil {
+		r.Logger.Error(ctx, shared.AssetProduct, err.Error())
+		return err
 	}
 
 	return nil
 }
 
-func (r *RepositoryImpl) CreateProductPrice(ctx context.Context, price dProduct.ProductPrice) error {
-	insertQuery := `INSERT INTO product_prices (
-		price_id, product_id, date_added, price
-	) VALUES (
-		:price_id, :product_id, :date_added, :price
-	);`
+func (r *RepositoryImpl) Delete(ctx context.Context, q database.Querier, id uuid.UUID) error {
+	query := `DELETE FROM products WHERE product_id = $1;`
 
-	modelPrice := DomainToModelPrice(price)
-	if _, errInsert := r.DB.ExecContext(ctx, insertQuery, modelPrice); errInsert != nil {
-		r.Logger.Error(ctx, shared.AssetProduct, errInsert.Error())
-		return errInsert
+	if _, err := q.ExecContext(ctx, query, id); err != nil {
+		r.Logger.Error(ctx, shared.AssetProduct, err.Error())
+		return err
 	}
 
 	return nil
 }
 
-/* ==================== Update ====================== */
+func (r *RepositoryImpl) FindByID(ctx context.Context, q database.Querier, id uuid.UUID) (dProduct.Product, error) {
+	query := `SELECT * FROM products WHERE product_id = $1;`
 
-func (r *RepositoryImpl) UpdateProduct(ctx context.Context, product dProduct.Product) error {
-	updateQuery := `UPDATE products SET name = :name, description = :description, image = :image WHERE product_id = :product_id;`
-
-	modelProduct := DomainToModelProduct(product)
-	if _, errUpdate := r.DB.NamedExecContext(ctx, updateQuery, modelProduct); errUpdate != nil {
-		r.Logger.Error(ctx, shared.AssetProduct, errUpdate.Error())
-		return errUpdate
-	}
-
-	return nil
-}
-
-func (r *RepositoryImpl) UpdateProductStock(ctx context.Context, stock dProduct.ProductStock) error {
-	updateQuery := `UPDATE product_stocks SET stock = :stock WHERE stock_id = :stock_id;`
-
-	modelStock := DomainToModelStock(stock)
-	if _, errUpdate := r.DB.NamedExecContext(ctx, updateQuery, modelStock); errUpdate != nil {
-		r.Logger.Error(ctx, shared.AssetProduct, errUpdate.Error())
-		return errUpdate
-	}
-
-	return nil
-}
-
-func (r *RepositoryImpl) UpdateProductPrice(ctx context.Context, price dProduct.ProductPrice) error {
-	updateQuery := `UPDATE product_prices SET price = :price WHERE price_id = :price_id;`
-
-	modelPrice := DomainToModelPrice(price)
-	if _, errUpdate := r.DB.NamedExecContext(ctx, updateQuery, modelPrice); errUpdate != nil {
-		r.Logger.Error(ctx, shared.AssetProduct, errUpdate.Error())
-		return errUpdate
-	}
-
-	return nil
-}
-
-/* ==================== Fetch ====================== */
-
-func (r *RepositoryImpl) GetOnlyProduct(ctx context.Context, productID uuid.UUID) (dProduct.Product, error) {
-	getQuery := `SELECT * FROM products WHERE product_id = $1;`
-
-	var modelProduct ModelProduct
-	if errGet := r.DB.GetContext(ctx, &modelProduct, getQuery, productID); errGet != nil {
-		r.Logger.Error(ctx, shared.AssetProduct, errGet.Error())
-		return dProduct.Product{}, errGet
+	var modelProduct ProductModel
+	if err := q.GetContext(ctx, &modelProduct, query, id); err != nil {
+		r.Logger.Error(ctx, shared.AssetProduct, err.Error())
+		return dProduct.Product{}, err
 	}
 
 	return modelProduct.ToDomain(), nil
 }
 
-func (r *RepositoryImpl) GetOneProduct(ctx context.Context, productID uuid.UUID) (dProduct.ProductDetail, error) {
-	getProductQuery := `SELECT * FROM products WHERE product_id = $1;`
-	getProductStockQuery := `SELECT * FROM product_stocks WHERE product_id = $1 ORDER BY date_added DESC;`
-	getProductPriceQuery := `SELECT * FROM product_prices WHERE product_id = $1 ORDER BY date_added DESC;`
+func (r *RepositoryImpl) FindDetailByID(ctx context.Context, q database.Querier, id uuid.UUID) (dProduct.ProductDetail, error) {
+	productQuery := `SELECT * FROM products WHERE product_id = $1;`
+	stockQuery := `SELECT * FROM product_stocks WHERE product_id = $1;`
+	priceQuery := `SELECT * FROM product_prices WHERE product_id = $1;`
 
-	var modelProduct ModelProduct
-	if errGetProduct := r.DB.GetContext(ctx, &modelProduct, getProductQuery, productID); errGetProduct != nil {
-		r.Logger.Error(ctx, shared.AssetProduct, errGetProduct.Error())
-		return dProduct.ProductDetail{}, errGetProduct
+	var productModel ProductModel
+	if err := q.GetContext(ctx, &productModel, productQuery, id); err != nil {
+		r.Logger.Error(ctx, shared.AssetProduct, err.Error())
+		return dProduct.ProductDetail{}, err
 	}
 
-	var modelStocks []ModelProductStock
-	if errGetStocks := r.DB.SelectContext(ctx, &modelStocks, getProductStockQuery, productID); errGetStocks != nil && !errors.Is(errGetStocks, sql.ErrNoRows) {
-		r.Logger.Error(ctx, shared.AssetProduct, errGetStocks.Error())
-		return dProduct.ProductDetail{}, errGetStocks
+	var stocks []dProduct.ProductStock
+	var stockModels []ProductStockModel
+	if err := q.SelectContext(ctx, &stockModels, stockQuery, id); err != nil {
+		r.Logger.Error(ctx, shared.AssetProduct, err.Error())
+		return dProduct.ProductDetail{}, err
 	}
 
-	var modelPrices []ModelProductPrice
-	if errGetPrices := r.DB.SelectContext(ctx, &modelPrices, getProductPriceQuery, productID); errGetPrices != nil && !errors.Is(errGetPrices, sql.ErrNoRows) {
-		r.Logger.Error(ctx, shared.AssetProduct, errGetPrices.Error())
-		return dProduct.ProductDetail{}, errGetPrices
+	var prices []dProduct.ProductPrice
+	var priceModels []ProductPriceModel
+	if err := q.SelectContext(ctx, &priceModels, priceQuery, id); err != nil {
+		r.Logger.Error(ctx, shared.AssetProduct, err.Error())
+		return dProduct.ProductDetail{}, err
 	}
 
-	product := modelProduct.ToDomain()
-
-	stocks := make([]dProduct.ProductStock, len(modelStocks))
-	for i, m := range modelStocks {
-		stocks[i] = m.ToDomain()
-	}
-
-	prices := make([]dProduct.ProductPrice, len(modelPrices))
-	for i, m := range modelPrices {
+	for i, m := range priceModels {
 		prices[i] = m.ToDomain()
 	}
 
+	for i, m := range stockModels {
+		stocks[i] = m.ToDomain()
+	}
+
 	return dProduct.ProductDetail{
-		Product: product,
-		Stocks:  stocks,
+		Product: productModel.ToDomain(),
 		Prices:  prices,
+		Stocks:  stocks,
 	}, nil
 }
 
-func (r *RepositoryImpl) GetManyProducts(ctx context.Context, farmID uuid.UUID) ([]dProduct.ProductDetail, error) {
-	getQuery := `SELECT 
-    		p.*, 
-    		ps.*, 
-    		pp.* 
-		FROM products p 
-		WHERE p.farm_id = $1
-		LEFT JOIN LATERAL (
-			SELECT ps.* FROM product_stocks ps WHERE ps.product_id = p.product_id ORDER BY ps.date_added DESC LIMIT 1
-		) ps ON TRUE 
-		LEFT JOIN LATERAL (
-		    SELECT pp.* FROM product_prices pp WHERE pp.product_id = p.product_id ORDER BY pp.date_added DESC LIMIT 1
-		) pp ON TRUE
-		WHERE p.farm_id = $1;`
-
-	type scanModel struct {
-		ModelProduct
-		ModelProductStock
-		ModelProductPrice
+func (r *RepositoryImpl) ListByFarmID(ctx context.Context, q database.Querier, farmID uuid.UUID) ([]dProduct.ProductDetail, error) {
+	var productModels []ProductModel
+	if err := q.SelectContext(ctx, &productModels, `SELECT * FROM products WHERE farm_id = $1;`, farmID); err != nil {
+		r.Logger.Error(ctx, shared.AssetProduct, err.Error())
+		return nil, err
+	}
+	if len(productModels) == 0 {
+		return []dProduct.ProductDetail{}, nil
 	}
 
-	var scanModels []scanModel
-	if errGet := r.DB.SelectContext(ctx, &scanModels, getQuery, farmID); errGet != nil {
-		r.Logger.Error(ctx, shared.AssetProduct, errGet.Error())
-		return nil, errGet
+	productIDs := make([]uuid.UUID, len(productModels))
+	for i, m := range productModels {
+		productIDs[i] = m.ID
 	}
 
-	productDetails := make([]dProduct.ProductDetail, len(scanModels))
-	for i, sm := range scanModels {
-		productDetails[i] = dProduct.ProductDetail{
-			Product: sm.ModelProduct.ToDomain(),
-			Stocks: []dProduct.ProductStock{
-				sm.ModelProductStock.ToDomain(),
-			},
-			Prices: []dProduct.ProductPrice{
-				sm.ModelProductPrice.ToDomain(),
-			},
+	var stockModels []ProductStockModel
+	var priceModels []ProductPriceModel
+
+	queryStocks, argsStocks, _ := sqlx.In(`SELECT * FROM product_stocks WHERE product_id IN (?)`, productIDs)
+	queryPrices, argsPrices, _ := sqlx.In(`SELECT * FROM product_prices WHERE product_id IN (?)`, productIDs)
+
+	if err := q.SelectContext(ctx, &stockModels, q.Rebind(queryStocks), argsStocks...); err != nil {
+		return nil, err
+	}
+	if err := q.SelectContext(ctx, &priceModels, q.Rebind(queryPrices), argsPrices...); err != nil {
+		return nil, err
+	}
+
+	stockMap := make(map[uuid.UUID][]dProduct.ProductStock)
+	for _, sm := range stockModels {
+		stockMap[sm.ProductID] = append(stockMap[sm.ProductID], sm.ToDomain())
+	}
+
+	priceMap := make(map[uuid.UUID][]dProduct.ProductPrice)
+	for _, pm := range priceModels {
+		priceMap[pm.ProductID] = append(priceMap[pm.ProductID], pm.ToDomain())
+	}
+
+	results := make([]dProduct.ProductDetail, len(productModels))
+	for i, m := range productModels {
+		results[i] = dProduct.ProductDetail{
+			Product: m.ToDomain(),
+			Stocks:  stockMap[m.ID],
+			Prices:  priceMap[m.ID],
 		}
 	}
 
-	return productDetails, nil
+	return results, nil
 }
 
-/* ==================== Delete ====================== */
+func (r *RepositoryImpl) AddStock(ctx context.Context, q database.Querier, s dProduct.ProductStock) error {
+	query := `
+		INSERT INTO product_stocks (
+			stock_id, product_id,
+			created_at, type,
+			quantity
+		) VALUES (
+			:stock_id, :product_id, 
+			:created_at, :type, 
+		  	:quantity
+		);`
 
-func (r *RepositoryImpl) DeleteProduct(ctx context.Context, productID uuid.UUID) error {
-	deleteQuery := `DELETE FROM products WHERE product_id = $1;`
-
-	if _, errDelete := r.DB.ExecContext(ctx, deleteQuery, productID); errDelete != nil {
-		r.Logger.Error(ctx, shared.AssetProduct, errDelete.Error())
-		return errDelete
+	stockModel := ToStockModel(s)
+	if _, err := q.NamedExecContext(ctx, query, stockModel); err != nil {
+		r.Logger.Error(ctx, shared.AssetProduct, err.Error())
+		return err
 	}
 
 	return nil
 }
 
-func (r *RepositoryImpl) DeleteProductStock(ctx context.Context, stockID uuid.UUID) error {
-	deleteQuery := `DELETE FROM product_stocks WHERE stock_id = $1;`
+func (r *RepositoryImpl) AddPrice(ctx context.Context, q database.Querier, p dProduct.ProductPrice) error {
+	query := `
+		INSERT INTO product_prices (
+			price_id, product_id,
+			created_at, price
+		) VALUES (
+			:price_id, :product_id,
+			:created_at, :price
+		);`
 
-	if _, errDelete := r.DB.ExecContext(ctx, deleteQuery, stockID); errDelete != nil {
-		r.Logger.Error(ctx, shared.AssetProduct, errDelete.Error())
-		return errDelete
+	priceModel := ToPriceModel(p)
+	if _, err := q.NamedExecContext(ctx, query, priceModel); err != nil {
+		r.Logger.Error(ctx, shared.AssetProduct, err.Error())
+		return err
 	}
 
 	return nil
 }
 
-func (r *RepositoryImpl) DeleteProductPrice(ctx context.Context, priceID uuid.UUID) error {
-	deleteQuery := `DELETE FROM product_prices WHERE price_id = $1;`
+func (r *RepositoryImpl) DeleteStock(ctx context.Context, q database.Querier, stockID uuid.UUID) error {
+	query := `DELETE FROM product_stocks WHERE stock_id = $1;`
 
-	if _, errDelete := r.DB.ExecContext(ctx, deleteQuery, priceID); errDelete != nil {
-		r.Logger.Error(ctx, shared.AssetProduct, errDelete.Error())
-		return errDelete
+	if _, err := q.ExecContext(ctx, query, stockID); err != nil {
+		r.Logger.Error(ctx, shared.AssetProduct, err.Error())
+		return err
 	}
 
 	return nil
 }
 
-func NewRepository(db *sqlx.DB, logger *utils.Logger) dProduct.Repository {
-	return &RepositoryImpl{
-		DB:     db,
-		Logger: logger,
+func (r *RepositoryImpl) DeletePrice(ctx context.Context, q database.Querier, priceID uuid.UUID) error {
+	query := `DELETE FROM product_prices WHERE price_id = $1;`
+
+	if _, err := q.ExecContext(ctx, query, priceID); err != nil {
+		r.Logger.Error(ctx, shared.AssetProduct, err.Error())
+		return err
 	}
+
+	return nil
 }

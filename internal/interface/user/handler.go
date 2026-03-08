@@ -2,7 +2,9 @@ package user
 
 import (
 	aUser "agropal/internal/application/user"
+	dAuth "agropal/internal/domain/auth"
 	"agropal/internal/domain/shared"
+	dUser "agropal/internal/domain/user"
 	"agropal/internal/request"
 	"agropal/internal/response"
 	"agropal/internal/utils"
@@ -30,17 +32,21 @@ func NewHandler(
 func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var userIDPtr *uuid.UUID
-	userID, err := h.IoHandler.IdentifierFromPathValue(r, "user_id")
-	if err != nil {
-		userIDPtr = nil
-	} else {
-		userIDPtr = &userID
+	var userID uuid.UUID
+	var err error
+
+	userIDStr := r.PathValue("user_id")
+	if userIDStr != "me" {
+		userID, err = uuid.Parse(userIDStr)
+		if err != nil {
+			h.IoHandler.WriteError(ctx, w, dUser.ErrInvalidUserID, nil)
+			return
+		}
 	}
 
-	user, err := h.UserService.GetByID(ctx, userIDPtr)
+	user, err := h.UserService.GetByID(ctx, userID)
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
@@ -50,56 +56,67 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userID, err := h.IoHandler.IdentifierFromPathValue(r, "user_id")
-	if err != nil {
-		h.IoHandler.WriteError(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, err)
-		return
+	var userID uuid.UUID
+	var err error
+
+	userIDStr := r.PathValue("user_id")
+	if userIDStr != "me" {
+		userID, err = uuid.Parse(userIDStr)
+		if err != nil {
+			h.IoHandler.WriteError(ctx, w, dUser.ErrInvalidUserID, nil)
+			return
+		}
 	}
 
 	var req request.UserUpdateRequest
 	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
 	}
 	cmd := req.ToCommand(userID)
 
 	if err = h.UserService.Update(ctx, cmd); err != nil {
-		h.IoHandler.WriteError(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dAuth.AUTH_INVALID_CREDENTIALS, nil)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var userIDPtr *uuid.UUID
-	userID, err := h.IoHandler.IdentifierFromPathValue(r, "user_id")
-	if err != nil {
-		userIDPtr = nil
-	} else {
-		userIDPtr = &userID
+	var userID uuid.UUID
+	var err error
+
+	userIDStr := r.PathValue("user_id")
+	if userIDStr != "me" {
+		userID, err = uuid.Parse(userIDStr)
+		if err != nil {
+			h.IoHandler.WriteError(ctx, w, dUser.ErrInvalidUserID, nil)
+			return
+		}
 	}
 
-	query := r.URL.Query().Get("delete_type")
+	query := r.URL.Query().Get("permanent")
+
 	var deleteType shared.DeleteType
 	switch query {
-	case string(shared.DeleteSoft):
-		deleteType = shared.DeleteSoft
-	case string(shared.DeleteHard):
+	case "true":
 		deleteType = shared.DeleteHard
+	case "false":
+		deleteType = shared.DeleteSoft
 	default:
-		h.IoHandler.WriteError(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, errors.New("invalid delete type"))
+		h.IoHandler.WriteError(r.Context(), w, shared.ErrInvalidRequest, nil)
 		return
 	}
 
-	if err = h.UserService.Delete(ctx, deleteType, userIDPtr); err != nil {
-		h.IoHandler.WriteError(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, err)
+	if err = h.UserService.Delete(ctx, deleteType, userID); err != nil {
+		h.IoHandler.WriteError(r.Context(), w, dAuth.AUTH_INVALID_CREDENTIALS, nil)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, nil)
+	h.IoHandler.WriteSuccess(r.Context(), w, dAuth.AUTH_INVALID_CREDENTIALS, nil)
 }
 
 func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {
@@ -119,20 +136,20 @@ func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	case string(shared.AssetComment):
 		assetType = shared.AssetComment
 	default:
-		h.IoHandler.WriteError(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, errors.New("invalid asset type"))
+		h.IoHandler.WriteError(r.Context(), w, dAuth.AUTH_INVALID_CREDENTIALS, errors.New("invalid asset type"))
 		return
 	}
 
 	assetIDStr := r.URL.Query().Get("asset_id")
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
-		h.IoHandler.WriteError(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, errors.New("invalid asset ID"))
+		h.IoHandler.WriteError(r.Context(), w, dAuth.AUTH_INVALID_CREDENTIALS, errors.New("invalid asset ResCode"))
 		return
 	}
 
 	users, err := h.UserService.GetUsers(ctx, assetType, assetID)
 	if err != nil {
-		h.IoHandler.WriteError(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(r.Context(), w, dAuth.AUTH_INVALID_CREDENTIALS, nil)
 		return
 	}
 

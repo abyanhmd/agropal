@@ -1,179 +1,243 @@
 package post
 
 import (
+	"agropal/internal/database"
 	dPost "agropal/internal/domain/post"
 	"agropal/internal/domain/shared"
 	"agropal/internal/utils"
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 )
 
 type RepositoryImpl struct {
-	DB     *sqlx.DB
 	Logger *utils.Logger
 }
 
-func (r *RepositoryImpl) CreatePost(ctx context.Context, post dPost.Post) error {
-	insertQuery := `INSERT INTO posts (
-		post_id, title, content, user_id, slug, like, dislike, view
-	) VALUES ( 
-		:post_id, :title, :content, :user_id, :slug, :like, :dislike, :view
-	);`
+func NewRepository(logger *utils.Logger) dPost.Repository {
+	return &RepositoryImpl{Logger: logger}
+}
 
-	modelPost := DomainToModelPost(post)
-	if _, errInsert := r.DB.NamedExecContext(ctx, insertQuery, modelPost); errInsert != nil {
-		r.Logger.Error(ctx, shared.System, errInsert.Error())
-		return errInsert
+func (r *RepositoryImpl) Create(ctx context.Context, q database.Querier, p dPost.Post) error {
+	query := `
+		INSERT INTO posts (
+			post_id, user_id, 
+			title, content,
+			slug, created_at
+		) VALUES (
+			:post_id, :user_id, 
+			:title, :content,
+			:slug, :created_at
+		);`
+
+	modelPost := ToPostModel(p)
+	if _, err := q.NamedExecContext(ctx, query, modelPost); err != nil {
+		r.Logger.Error(ctx, shared.AssetPost, err.Error())
+		return err
 	}
 
 	return nil
 }
 
-func (r *RepositoryImpl) GetOnePost(ctx context.Context, postID uuid.UUID) (dPost.PostDetail, error) {
-	getPostQuery := `SELECT * FROM posts WHERE post_id = $1;`
+func (r *RepositoryImpl) Update(ctx context.Context, q database.Querier, p dPost.Post) error {
+	query := `
+		UPDATE posts SET
+			title = :title,
+			content = :content,
+			updated_at = :updated_at
+		WHERE post_id = :post_id;`
 
-	var modelPost ModelPost
-	if errGet := r.DB.GetContext(ctx, &modelPost, getPostQuery, postID); errGet != nil {
-		r.Logger.Error(ctx, shared.System, errGet.Error())
-		return dPost.PostDetail{}, errGet
-	}
-	post := modelPost.ToDomain()
-
-	getCommentQuery := `SELECT * FROM post_comments WHERE post_id = $1;`
-
-	var modelComments []ModelPostComment
-	if errSelect := r.DB.SelectContext(ctx, &modelComments, getCommentQuery, postID); errSelect != nil {
-		r.Logger.Error(ctx, shared.System, errSelect.Error())
-		return dPost.PostDetail{}, errSelect
-	}
-	comments := make([]dPost.PostComment, len(modelComments))
-	for i, m := range modelComments {
-		comments[i] = m.ToDomain()
+	modelPost := ToPostModel(p)
+	if _, err := q.NamedExecContext(ctx, query, modelPost); err != nil {
+		r.Logger.Error(ctx, shared.AssetPost, err.Error())
+		return err
 	}
 
-	return dPost.PostDetail{
-		Post:     post,
-		Comments: comments,
-	}, nil
+	return nil
 }
 
-func (r *RepositoryImpl) GetManyPosts(ctx context.Context) ([]dPost.Post, error) {
-	getPostQuery := `SELECT * FROM posts`
+func (r *RepositoryImpl) Delete(ctx context.Context, q database.Querier, id uuid.UUID) error {
+	query := `DELETE FROM posts WHERE post_id = $1;`
 
-	var modelPosts []ModelPost
-	if errSelect := r.DB.SelectContext(ctx, &modelPosts, getPostQuery); errSelect != nil {
-		r.Logger.Error(ctx, shared.System, errSelect.Error())
-		return nil, errSelect
+	if _, err := q.ExecContext(ctx, query, id); err != nil {
+		r.Logger.Error(ctx, shared.AssetPost, err.Error())
+		return err
 	}
-	posts := make([]dPost.Post, len(modelPosts))
-	for i, m := range modelPosts {
+
+	return nil
+}
+
+func (r *RepositoryImpl) FindByID(ctx context.Context, q database.Querier, id uuid.UUID) (dPost.Post, error) {
+	query := `SELECT * FROM posts WHERE post_id = $1;`
+
+	var modelPost PostModel
+	if err := q.GetContext(ctx, &modelPost, query, id); err != nil {
+		r.Logger.Error(ctx, shared.AssetPost, err.Error())
+		return dPost.Post{}, err
+	}
+
+	return modelPost.ToDomain(), nil
+}
+
+func (r *RepositoryImpl) FindBySlug(ctx context.Context, q database.Querier, slug string) (dPost.Post, error) {
+	query := `SELECT * FROM posts WHERE slug = $1;`
+
+	var modelPost PostModel
+	if err := q.GetContext(ctx, &modelPost, query, slug); err != nil {
+		r.Logger.Error(ctx, shared.AssetPost, err.Error())
+		return dPost.Post{}, err
+	}
+
+	return modelPost.ToDomain(), nil
+}
+
+func (r *RepositoryImpl) List(ctx context.Context, q database.Querier, limit, offset int) ([]dPost.Post, error) {
+	query := `SELECT * FROM posts ORDER BY created_at DESC LIMIT $1 OFFSET $2;`
+
+	var models []PostModel
+	if err := q.SelectContext(ctx, &models, query, limit, offset); err != nil {
+		r.Logger.Error(ctx, shared.AssetPost, err.Error())
+		return nil, err
+	}
+
+	posts := make([]dPost.Post, len(models))
+	for i, m := range models {
 		posts[i] = m.ToDomain()
 	}
 
 	return posts, nil
 }
 
-func (r *RepositoryImpl) CreatePostComment(ctx context.Context, comment dPost.PostComment) error {
-	insertQuery := `INSERT INTO post_comments (
-		comment_id, post_id, content, user_id, like, dislike, view
-	) VALUES (	          
-		:comment_id, :post_id, :content, :user_id, :like, :dislike, :view
-	);`
+func (r *RepositoryImpl) AddComment(ctx context.Context, q database.Querier, c dPost.PostComment) error {
+	query := `
+		INSERT INTO post_comments (
+			comment_id, post_id, 
+			user_id, parent_id, 
+			content, created_at
+		) VALUES (
+			:comment_id, :post_id,
+			:user_id, :parent_id,
+			:content, :created_at
+		);`
 
-	modelComment := DomainToModelComment(comment)
-	if _, errInsert := r.DB.ExecContext(ctx, insertQuery, modelComment); errInsert != nil {
-		r.Logger.Error(ctx, shared.System, errInsert.Error())
-		return errInsert
+	modelComment := ToCommentModel(c)
+	if _, err := q.NamedExecContext(ctx, query, modelComment); err != nil {
+		r.Logger.Error(ctx, shared.AssetPost, err.Error())
+		return err
 	}
 
 	return nil
 }
 
-func (r *RepositoryImpl) GetPostComments(ctx context.Context, postID uuid.UUID) ([]dPost.PostComment, error) {
-	selectQuery := `SELECT * FROM post_comments WHERE post_id = $1;`
+func (r *RepositoryImpl) ListTopLevel(ctx context.Context, q database.Querier, postID uuid.UUID, limit, offset int) ([]dPost.PostComment, error) {
+	query := `
+		SELECT * 
+		FROM post_comments 
+        WHERE post_id = $1 
+			AND parent_id IS NULL 
+        ORDER BY created_at DESC 
+        LIMIT $2 OFFSET $3;`
 
-	var modelComments []ModelPostComment
-	if errSelect := r.DB.SelectContext(ctx, &modelComments, selectQuery, postID); errSelect != nil {
-		r.Logger.Error(ctx, shared.System, errSelect.Error())
-		return nil, errSelect
+	var models []CommentModel
+	if err := q.SelectContext(ctx, &models, query, postID, limit, offset); err != nil {
+		r.Logger.Error(ctx, shared.AssetPost, err.Error())
+		return nil, err
 	}
-	comments := make([]dPost.PostComment, len(modelComments))
-	for i, m := range modelComments {
+
+	comments := make([]dPost.PostComment, len(models))
+	for i, m := range models {
 		comments[i] = m.ToDomain()
 	}
 
 	return comments, nil
 }
 
-func (r *RepositoryImpl) CreatePostEngagement(ctx context.Context, engagement dPost.PostEngagement) (err error) {
-	tx, errTx := r.DB.BeginTxx(ctx, nil)
-	if errTx != nil {
-		return errTx
-	}
-	defer func() {
-		if p := recover(); p != nil {
-			tx.Rollback()
-			panic(p)
-		} else if err != nil {
-			tx.Rollback()
-		}
-	}()
+func (r *RepositoryImpl) ListReplies(ctx context.Context, q database.Querier, parentID uuid.UUID, limit, offset int) ([]dPost.PostComment, error) {
+	query := `
+		SELECT * 
+		FROM post_comments 
+        WHERE parent_id = $1
+        ORDER BY like_count DESC 
+		LIMIT $2 OFFSET $3;`
 
-	insertQuery := `INSERT INTO post_engagements (
-		engagement_id, post_id, user_id, type
-	) VALUES (
-		:engagement_id, :post_id, :user_id, :type
-	);`
-
-	var updateEngagementQuery string
-	switch engagement.Type {
-	case dPost.EngagementPostLike:
-		updateEngagementQuery = `UPDATE posts SET "like" = "like" + 1 WHERE post_id = $1`
-
-	case dPost.EngagementPostDislike:
-		updateEngagementQuery = `UPDATE posts SET dislike = dislike + 1 WHERE post_id = $1`
-
-	case dPost.EngagementPostView:
-		updateEngagementQuery = `UPDATE posts SET view = view + 1 WHERE post_id = $1`
-
-	case dPost.EngagementPostCommentLike:
-		updateEngagementQuery = `UPDATE post_comments SET "like" = "like" + 1 WHERE comment_id = $1`
-
-	case dPost.EngagementPostCommentDislike:
-		updateEngagementQuery = `UPDATE post_comments SET dislike = dislike + 1 WHERE comment_id = $1`
-
-	case dPost.EngagementPostCommentView:
-		updateEngagementQuery = `UPDATE post_comments SET view = view + 1 WHERE comment_id = $1`
-
-	default:
-		return errors.New("invalid engagement type")
+	var models []CommentModel
+	if err := q.SelectContext(ctx, &models, query, parentID, limit, offset); err != nil {
+		r.Logger.Error(ctx, shared.AssetPost, err.Error())
+		return nil, err
 	}
 
-	modelEngagement := DomainToModelEngagement(engagement)
-	if _, errInsert := tx.NamedExecContext(ctx, insertQuery, modelEngagement); errInsert != nil {
-		r.Logger.Error(ctx, shared.System, errInsert.Error())
-		return errInsert
+	comments := make([]dPost.PostComment, len(models))
+	for i, m := range models {
+		comments[i] = m.ToDomain()
 	}
 
-	if _, errUpdate := tx.ExecContext(ctx, updateEngagementQuery, engagement.PostID); errUpdate != nil {
-		r.Logger.Error(ctx, shared.System, errUpdate.Error())
-		return errUpdate
-	}
+	return comments, nil
+}
 
-	if errCommit := tx.Commit(); errCommit != nil {
-		r.Logger.Error(ctx, shared.System, errCommit.Error())
-		return errCommit
+func (r *RepositoryImpl) AddEngagement(ctx context.Context, q database.Querier, e dPost.PostEngagement) error {
+	query := `
+		INSERT INTO post_engagements (
+			engagement_id, asset_id,
+			asset_type, user_id,
+			type, created_at
+		) VALUES (
+			:engagement_id, :asset_id,
+			:asset_type, :user_id,
+			:type, :created_at
+		);`
+
+	modelEngagement := ToEngagementModel(e)
+	if _, err := q.NamedExecContext(ctx, query, modelEngagement); err != nil {
+		r.Logger.Error(ctx, shared.AssetPost, err.Error())
+		return err
 	}
 
 	return nil
 }
 
-func NewRepository(db *sqlx.DB, logger *utils.Logger) dPost.Repository {
-	return &RepositoryImpl{
-		DB:     db,
-		Logger: logger,
+func (r *RepositoryImpl) SyncCounts(ctx context.Context, q database.Querier, assetType dPost.PostType, assetID uuid.UUID) error {
+	var tableName, idColumn, extraCountColumn, extraCountQuery string
+	var assetTypeStr shared.AssetType
+
+	switch assetType {
+	case dPost.TypePost:
+		assetTypeStr = shared.AssetPost
+		tableName = "posts"
+		idColumn = "post_id"
+		extraCountColumn = "comment_count"
+		extraCountQuery = "(SELECT COUNT(*) FROM post_comments WHERE post_id = $1 AND parent_id IS NULL)"
+	case dPost.TypeComment:
+		assetTypeStr = shared.AssetComment
+		tableName = "post_comments"
+		idColumn = "comment_id"
+		extraCountColumn = "reply_count"
+		extraCountQuery = "(SELECT COUNT(*) FROM post_comments WHERE parent_id = $1)"
+	default:
+		return dPost.ErrInvalidAssetType
 	}
+
+	query := fmt.Sprintf(`
+        WITH engagement_stats AS (
+            SELECT 
+                COUNT(*) FILTER (WHERE type = 'LIKE') as likes,
+                COUNT(*) FILTER (WHERE type = 'DISLIKE') as dislikes,
+                COUNT(*) FILTER (WHERE type = 'VIEW') as views
+            FROM post_engagements 
+            WHERE asset_type = $2 AND asset_id = $1
+        )
+        UPDATE %s SET 
+            like_count = stats.likes,
+            dislike_count = stats.dislikes,
+            view_count = stats.views,
+            %s = %s
+        FROM engagement_stats stats
+        WHERE %s = $1`, tableName, extraCountColumn, extraCountQuery, idColumn)
+
+	if _, err := q.ExecContext(ctx, query, assetID, assetType); err != nil {
+		r.Logger.Error(ctx, assetTypeStr, err.Error())
+		return err
+	}
+
+	return nil
 }

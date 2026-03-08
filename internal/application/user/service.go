@@ -1,6 +1,7 @@
 package user
 
 import (
+	"agropal/internal/database"
 	dNote "agropal/internal/domain/note"
 	"agropal/internal/domain/shared"
 	dUser "agropal/internal/domain/user"
@@ -13,29 +14,27 @@ import (
 )
 
 type Service struct {
-	UserRepository dUser.Repository
+	Transactor database.Transactor
+	UserRepo   dUser.Repository
 }
 
-func NewService(userRepository dUser.Repository) Service {
+func NewService(userRepo dUser.Repository) Service {
 	return Service{
-		UserRepository: userRepository,
+		UserRepo: userRepo,
 	}
 }
 
-func (s *Service) GetByID(ctx context.Context, userIDPtr *uuid.UUID) (dUser.User, error) {
-	var userID uuid.UUID
+func (s *Service) GetByID(ctx context.Context, userID uuid.UUID) (dUser.User, error) {
 	var err error
 
-	if userIDPtr == nil {
-		userID, err = utils.GetUserIDFromContext(ctx)
+	if userID == uuid.Nil {
+		userID, err = utils.ExtractUserID(ctx)
 		if err != nil {
-			return dUser.User{}, err
+			return dUser.User{}, dUser.ErrInvalidUserID
 		}
-	} else {
-		userID = *userIDPtr
 	}
 
-	return s.UserRepository.GetOne(ctx, userID)
+	return s.UserRepo.FindByID(ctx, s.Transactor.DB(), userID)
 }
 
 func (s *Service) Update(ctx context.Context, cmd UserCommand) error {
@@ -43,41 +42,38 @@ func (s *Service) Update(ctx context.Context, cmd UserCommand) error {
 
 	// TODO: Validate update input
 
-	return s.UserRepository.Update(ctx, user)
+	return s.UserRepo.Update(ctx, user)
 }
 
-func (s *Service) Delete(ctx context.Context, deleteType shared.DeleteType, userIDPtr *uuid.UUID) error {
-	var userID uuid.UUID
+func (s *Service) Delete(ctx context.Context, deleteType shared.DeleteType, userID uuid.UUID) error {
 	var err error
 
-	if userIDPtr == nil {
-		userID, err = utils.GetUserIDFromContext(ctx)
+	if userID == uuid.Nil {
+		userID, err = utils.ExtractUserID(ctx)
 		if err != nil {
-			return err
+			return dUser.ErrInvalidUserID
 		}
-	} else {
-		userID = *userIDPtr
+	}
+
+	nowUTC := time.Now().UTC()
+	noteID, err := uuid.NewV7()
+	if err != nil {
+		return err
+	}
+	deleteNote := dNote.Note{
+		ID:        noteID,
+		CreatedAt: nowUTC,
+		AssetType: shared.AssetUser,
+		AssetID:   userID,
 	}
 
 	switch deleteType {
 	case shared.DeleteSoft:
-		deleteNote := dNote.Note{
-			NoteID:    uuid.New(),
-			DateAdded: time.Now(),
-			NoteType:  dNote.NoteSoftDelete,
-			AssetType: shared.AssetUser,
-			AssetID:   userID,
-		}
-		return s.UserRepository.SoftDelete(ctx, deleteNote)
+		deleteNote.Type = dNote.NoteSoftDelete
+		return s.UserRepo.SoftDelete(ctx, s.Transactor.DB(), userID, nowUTC)
 	case shared.DeleteHard:
-		deleteNote := dNote.Note{
-			NoteID:    uuid.New(),
-			DateAdded: time.Now(),
-			NoteType:  dNote.NoteHardDelete,
-			AssetType: shared.AssetUser,
-			AssetID:   userID,
-		}
-		return s.UserRepository.HardDelete(ctx, userID, deleteNote)
+		deleteNote.Type = dNote.NoteHardDelete
+		return s.UserRepo.Delete(ctx, s.Transactor.DB(), userID)
 	default:
 		return errors.New("invalid delete type")
 	}
@@ -101,5 +97,5 @@ func (s *Service) GetUsers(ctx context.Context, assetTypeStr shared.AssetType, a
 		return nil, errors.New("invalid asset type")
 	}
 
-	return s.UserRepository.GetByAdmin(ctx, assetType, assetID)
+	return s.UserRepo.ListByAsset(ctx, assetType, assetID)
 }

@@ -52,7 +52,7 @@ func SaveContextFromRequest(r *http.Request, claims *Claims) context.Context {
 	return ctx
 }
 
-func GetUserIDFromContext(ctx context.Context) (uuid.UUID, error) {
+func ExtractUserID(ctx context.Context) (uuid.UUID, error) {
 	userIDStr := GetMetadata(ctx, ContextUserID)
 	if userIDStr == "" {
 		return uuid.Nil, errors.New("invalid user id")

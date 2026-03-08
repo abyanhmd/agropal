@@ -17,11 +17,11 @@ type TransactionCommand struct {
 
 func (c TransactionCommand) ToDomain(transactionID uuid.UUID) dTransaction.Transaction {
 	return dTransaction.Transaction{
-		TransactionID: transactionID,
-		Date:          c.Date,
-		Type:          c.Type,
-		Amount:        c.Amount,
-		Description:   c.Description,
-		ProductID:     c.ProductID,
+		ID:          transactionID,
+		Date:        c.Date,
+		Type:        c.Type,
+		Amount:      c.Amount,
+		Description: c.Description,
+		ProductID:   c.ProductID,
 	}
 }

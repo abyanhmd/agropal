@@ -23,7 +23,7 @@ type Logger struct {
 func NewLogger(c config.Config) *Logger {
 	var output io.Writer
 
-	if c.Stage == "production" {
+	if strings.ToUpper(c.Stage) == "PRODUCTION" {
 		logPath := path.Join(c.Path.Log, "app.log")
 		file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
@@ -90,9 +90,27 @@ func (l *Logger) withFields(ctx context.Context, level zerolog.Level, asset shar
 	}
 
 	funcName, filePath := getCallerInfo(3)
-	if len(funcName) > 3 && level == zerolog.InfoLevel {
-		event.Str("caller", funcName+"()")
+	shortFuncName := simplifyFuncName(funcName)
+	if strings.Contains(shortFuncName, ".func") {
+		shortFuncName = strings.Split(strings.Join(strings.Split(filePath, "/")[2:], "/"), ":")[0]
+	} else {
+		parts := strings.Split(funcName, ".")
+		shortFuncName = parts[len(parts)-1]
 	}
+
+	var operation string
+	if len(funcName) > 3 {
+		if strings.Contains(shortFuncName, "middleware/logger.go") {
+			operation = "HTTP Request"
+		} else if strings.Contains(shortFuncName, ".go") {
+			operation = shortFuncName
+			shortFuncName += "()"
+		} else {
+			operation = strings.Split(filePath, ":")[0]
+			shortFuncName += "()"
+		}
+	}
+	event.Str("caller", operation)
 
 	for _, exclude := range fileExclusion {
 		if strings.Contains(funcName, exclude) && level == zerolog.InfoLevel {
@@ -120,6 +138,16 @@ func (l *Logger) withFields(ctx context.Context, level zerolog.Level, asset shar
 	}
 
 	return event
+}
+
+func simplifyFuncName(full string) string {
+	parts := strings.Split(full, "/")
+	last := parts[len(parts)-1]
+
+	last = strings.ReplaceAll(last, "(*", "")
+	last = strings.ReplaceAll(last, ")", "")
+
+	return strings.Replace(last, ".", ".", 1)
 }
 
 func (l *Logger) Info(ctx context.Context, asset shared.AssetType, msg string) {

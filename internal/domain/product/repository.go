@@ -1,25 +1,24 @@
 package product
 
 import (
+	"agropal/internal/database"
 	"context"
 
 	"github.com/google/uuid"
 )
 
 type Repository interface {
-	CreateProduct(ctx context.Context, product Product) error
-	CreateProductStock(ctx context.Context, stock ProductStock) error
-	CreateProductPrice(ctx context.Context, price ProductPrice) error
+	Create(ctx context.Context, q database.Querier, p Product) error
+	Update(ctx context.Context, q database.Querier, p Product) error
+	Delete(ctx context.Context, q database.Querier, id uuid.UUID) error
 
-	UpdateProduct(ctx context.Context, product Product) error
-	UpdateProductStock(ctx context.Context, stock ProductStock) error
-	UpdateProductPrice(ctx context.Context, price ProductPrice) error
+	FindByID(ctx context.Context, q database.Querier, id uuid.UUID) (Product, error)
+	FindDetailByID(ctx context.Context, q database.Querier, id uuid.UUID) (ProductDetail, error)
+	ListByFarmID(ctx context.Context, q database.Querier, farmID uuid.UUID) ([]ProductDetail, error)
 
-	GetOnlyProduct(ctx context.Context, productID uuid.UUID) (Product, error)
-	GetOneProduct(ctx context.Context, productID uuid.UUID) (ProductDetail, error)
-	GetManyProducts(ctx context.Context, farmID uuid.UUID) ([]ProductDetail, error)
+	AddStock(ctx context.Context, q database.Querier, s ProductStock) error
+	AddPrice(ctx context.Context, q database.Querier, p ProductPrice) error
 
-	DeleteProduct(ctx context.Context, productID uuid.UUID) error
-	DeleteProductStock(ctx context.Context, stockID uuid.UUID) error
-	DeleteProductPrice(ctx context.Context, priceID uuid.UUID) error
+	DeleteStock(ctx context.Context, q database.Querier, stockID uuid.UUID) error
+	DeletePrice(ctx context.Context, q database.Querier, priceID uuid.UUID) error
 }

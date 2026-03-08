@@ -30,7 +30,7 @@ func (s *Service) Create(ctx context.Context, cmd WeatherCommand) error {
 }
 
 func (s *Service) GetByFarmID(ctx context.Context, farmID uuid.UUID) ([]dWeather.Weather, error) {
-	return s.WeatherRepository.GetByFarmID(ctx, farmID)
+	return s.WeatherRepository.ListByFarmID(ctx, farmID)
 }
 
 func (s *Service) Update(ctx context.Context, farmID uuid.UUID, cmd WeatherCommand) error {

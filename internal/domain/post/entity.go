@@ -1,6 +1,10 @@
 package post
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type PostDetail struct {
 	Post
@@ -8,41 +12,55 @@ type PostDetail struct {
 }
 
 type Post struct {
-	PostID  uuid.UUID
+	ID      uuid.UUID
+	UserID  uuid.UUID
 	Title   string
 	Content string
-	UserID  uuid.UUID
 	Slug    string
-	Like    int
-	Dislike int
-	View    int
+
+	CommentCount int
+	LikeCount    int
+	DislikeCount int
+	ViewCount    int
+
+	CreatedAt time.Time
+	UpdatedAt *time.Time
 }
 
 type PostComment struct {
-	CommentID uuid.UUID
-	PostID    uuid.UUID
-	Content   string
-	UserID    uuid.UUID
-	Like      int
-	Dislike   int
-	View      int
+	ID       uuid.UUID
+	PostID   uuid.UUID
+	UserID   uuid.UUID
+	ParentID *uuid.UUID
+	Content  string
+
+	ReplyCount   int
+	LikeCount    int
+	DislikeCount int
+	ViewCount    int
+
+	CreatedAt time.Time
+	UpdatedAt *time.Time
 }
 
 type PostEngagement struct {
-	EngagementID uuid.UUID
-	PostID       uuid.UUID
-	UserID       uuid.UUID
-	Type         EngagementType
+	ID        uuid.UUID
+	AssetID   uuid.UUID
+	AssetType PostType
+	UserID    uuid.UUID
+	Type      ActionType
+	CreatedAt time.Time
 }
 
-type EngagementType string
+type PostType string
+
+type ActionType string
 
 const (
-	EngagementPostLike    EngagementType = "post_like"
-	EngagementPostDislike EngagementType = "post_dislike"
-	EngagementPostView    EngagementType = "post_view"
+	TypePost    PostType = "POST"
+	TypeComment PostType = "COMMENT"
 
-	EngagementPostCommentLike    EngagementType = "post_comment_like"
-	EngagementPostCommentDislike EngagementType = "post_comment_dislike"
-	EngagementPostCommentView    EngagementType = "post_comment_view"
+	ActionLike    ActionType = "LIKE"
+	ActionDislike ActionType = "DISLIKE"
+	ActionView    ActionType = "VIEW"
 )

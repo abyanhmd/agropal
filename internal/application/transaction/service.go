@@ -30,11 +30,11 @@ func (s *Service) Create(ctx context.Context, cmd TransactionCommand) error {
 }
 
 func (s *Service) GetOne(ctx context.Context, transactionID uuid.UUID) (dTransaction.Transaction, error) {
-	return s.TransactionRepository.GetOne(ctx, transactionID)
+	return s.TransactionRepository.FindByID(ctx, transactionID)
 }
 
 func (s *Service) GetMany(ctx context.Context, farmID uuid.UUID) ([]dTransaction.Transaction, error) {
-	return s.TransactionRepository.GetMany(ctx, farmID)
+	return s.TransactionRepository.ListByFarmID(ctx, farmID)
 }
 
 func (s *Service) Update(ctx context.Context, transactionID uuid.UUID, cmd TransactionCommand) error {

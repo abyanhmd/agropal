@@ -7,7 +7,7 @@ import (
 
 func DomainToUserResponse(domain dUser.User) response.UserResponse {
 	return response.UserResponse{
-		UserID:   domain.UserID,
+		UserID:   domain.ID,
 		Name:     domain.Name,
 		Email:    domain.Email,
 		Username: domain.Username,

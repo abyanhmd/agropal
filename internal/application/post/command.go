@@ -21,7 +21,7 @@ type PostCommentCommand struct {
 type PostEngagementCommand struct {
 	PostID uuid.UUID
 	UserID uuid.UUID
-	Type   dPost.EngagementType
+	Type   dPost.ActionType
 }
 
 func (c PostCommand) ToDomain(userID uuid.UUID) dPost.Post {

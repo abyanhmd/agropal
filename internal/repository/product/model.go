@@ -6,25 +6,25 @@ import (
 	"github.com/google/uuid"
 )
 
-type ModelProduct struct {
-	ProductID   uuid.UUID `db:"product_id"`
+type ProductModel struct {
+	ID          uuid.UUID `db:"product_id"`
+	FarmID      uuid.UUID `db:"farm_id"`
 	Name        string    `db:"name"`
 	Description string    `db:"description"`
 	Image       string    `db:"image"`
-	FarmID      uuid.UUID `db:"farm_id"`
 }
 
-type ModelProductStock struct {
-	StockID   uuid.UUID `db:"stock_id"`
+type ProductStockModel struct {
+	ID        uuid.UUID `db:"stock_id"`
 	ProductID uuid.UUID `db:"product_id"`
-	DateAdded time.Time `db:"date_added"`
+	CreatedAt time.Time `db:"created_at"`
 	Type      string    `db:"type"`
-	Stock     float64   `db:"stock"`
+	Quantity  float64   `db:"quantity"`
 }
 
-type ModelProductPrice struct {
-	PriceID   uuid.UUID `db:"price_id"`
+type ProductPriceModel struct {
+	ID        uuid.UUID `db:"price_id"`
 	ProductID uuid.UUID `db:"product_id"`
-	DateAdded time.Time `db:"date_added"`
+	CreatedAt time.Time `db:"created_at"`
 	Price     float64   `db:"price"`
 }

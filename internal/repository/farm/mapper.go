@@ -2,18 +2,18 @@ package farm
 
 import dFarm "agropal/internal/domain/farm"
 
-func (m ModelFarm) ToDomain() dFarm.Farm {
-	return dFarm.Farm{
-		FarmID: m.FarmID,
-		UserID: m.UserID,
-		Name:   m.Name,
+func ToFarmModel(domain dFarm.Farm) FarmModel {
+	return FarmModel{
+		ID:     domain.ID,
+		Name:   domain.Name,
+		UserID: domain.UserID,
 	}
 }
 
-func DomainToModelFarm(domain dFarm.Farm) ModelFarm {
-	return ModelFarm{
-		FarmID: domain.FarmID,
-		UserID: domain.UserID,
-		Name:   domain.Name,
+func (m FarmModel) ToDomain() dFarm.Farm {
+	return dFarm.Farm{
+		ID:     m.ID,
+		Name:   m.Name,
+		UserID: m.UserID,
 	}
 }

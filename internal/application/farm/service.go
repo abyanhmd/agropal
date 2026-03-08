@@ -19,7 +19,7 @@ func NewService(farmRepository dFarm.Repository) Service {
 }
 
 func (s *Service) Create(ctx context.Context, cmd FarmCommand) error {
-	userID, errParse := utils.GetUserIDFromContext(ctx)
+	userID, errParse := utils.ExtractUserID(ctx)
 	if errParse != nil {
 		return errParse
 	}
@@ -28,7 +28,7 @@ func (s *Service) Create(ctx context.Context, cmd FarmCommand) error {
 		return errGen
 	}
 	farm := cmd.ToDomain(userID)
-	farm.FarmID = farmID
+	farm.ID = farmID
 
 	// TODO: Validate farm input
 
@@ -36,16 +36,16 @@ func (s *Service) Create(ctx context.Context, cmd FarmCommand) error {
 }
 
 func (s *Service) GetOne(ctx context.Context, farmID uuid.UUID) (dFarm.Farm, error) {
-	return s.FarmRepository.GetOne(ctx, farmID)
+	return s.FarmRepository.FindByID(ctx, farmID)
 }
 
 func (s *Service) GetMany(ctx context.Context) ([]dFarm.Farm, error) {
-	userID, errParse := utils.GetUserIDFromContext(ctx)
+	userID, errParse := utils.ExtractUserID(ctx)
 	if errParse != nil {
 		return nil, errParse
 	}
 
-	return s.FarmRepository.GetMany(ctx, userID)
+	return s.FarmRepository.ListByUserID(ctx, userID)
 }
 
 func (s *Service) Update(ctx context.Context, farmID uuid.UUID, cmd FarmCommand) error {
