@@ -43,7 +43,7 @@ func (c PostCommentCommand) ToDomain(userID uuid.UUID) dPost.PostComment {
 
 func (c PostEngagementCommand) ToDomain(userID uuid.UUID) dPost.PostEngagement {
 	return dPost.PostEngagement{
-		PostID: c.PostID,
+		ID:     c.PostID,
 		UserID: userID,
 		Type:   c.Type,
 	}

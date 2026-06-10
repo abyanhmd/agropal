@@ -87,11 +87,13 @@ type TransactionModule struct {
 }
 
 func NewContainer(
-	t Toolkit,
+	t *Toolkit,
 ) *Container {
 	transactor := database.NewTransactor(t.DB)
 	generator := identity.NewGenerator()
 	jwt := crypto.NewJWTProvider(t.Logger, t.Config, t.Encryption, generator)
+
+	/* Repository */
 
 	authRepo := persistence.NewAuthRepository(t.Logger)
 	userRepo := persistence.NewUserRepository(t.Logger)
@@ -101,6 +103,8 @@ func NewContainer(
 	productRepo := persistence.NewProductRepository(t.Logger)
 	postRepo := persistence.NewPostRepository(t.Logger)
 	transactionRepo := persistence.NewTransactionRepository(t.Logger)
+
+	/* Service */
 
 	authService := aAuth.NewService(transactor, generator, jwt, authRepo, userRepo)
 	userService := aUser.NewService(transactor, userRepo, noteRepo)

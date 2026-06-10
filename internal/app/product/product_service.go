@@ -136,15 +136,6 @@ func (s *Service) DeleteProduct(ctx context.Context, farmID, productID uuid.UUID
 		return err
 	}
 
-	deleteNote := dNote.Note{
-		CreatedAt:   time.Now().UTC(),
-		Type:        dNote.TypeDelete,
-		AssetType:   shared.AssetProduct,
-		AssetID:     productID,
-		AuthorID:    userID,
-		IsSystemLog: false,
-	}
-
 	return s.productRepo.DeleteProduct(ctx, s.transactor.DB(), productID)
 }
 

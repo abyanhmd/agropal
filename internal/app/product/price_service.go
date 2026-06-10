@@ -3,12 +3,16 @@ package product
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 func (s *Service) CreateProductPrice(ctx context.Context, farmID, productID uuid.UUID, cmd ProductPriceCommand) error {
-	product, errGet := s.productRepo.GetOnlyProduct(ctx, productID)
+	nowUTC := time.Now().UTC()
+	db := s.transactor.DB()
+
+	product, errGet := s.productRepo.FindProductByID(ctx, db, productID)
 	if errGet != nil {
 		return errGet
 	}
@@ -20,30 +24,18 @@ func (s *Service) CreateProductPrice(ctx context.Context, farmID, productID uuid
 	if errGen != nil {
 		return errGen
 	}
-
 	price := cmd.ToDomain(productID, priceID)
 
-	// TODO: Validate price input
-
-	return s.productRepo.CreateProductPrice(ctx, price)
-}
-
-func (s *Service) UpdateProductPrice(ctx context.Context, farmID, productID, priceID uuid.UUID, cmd ProductPriceCommand) error {
-	product, errGet := s.productRepo.GetOnlyProduct(ctx, productID)
-	if errGet != nil {
-		return errGet
+	if price.Price <= 0 {
+		return errors.New("price cannot be zero or negative")
 	}
-	if product.FarmID != farmID {
-		return errors.New("product id and  farm id does not match")
+	if price.DateAdded.After(nowUTC) {
+		return errors.New("date added cannot be in the future")
 	}
 
-	price := cmd.ToDomain(productID, priceID)
-
-	// TODO: Validate price input
-
-	return s.productRepo.UpdateProductPrice(ctx, price)
+	return s.productRepo.AddProductPrice(ctx, db, price)
 }
 
 func (s *Service) DeleteProductPrice(ctx context.Context, priceID uuid.UUID) error {
-	return s.productRepo.DeleteProductPrice(ctx, priceID)
+	return s.productRepo.DeleteProductPrice(ctx, s.transactor.DB(), priceID)
 }

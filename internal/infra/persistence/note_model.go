@@ -14,7 +14,7 @@ type NoteModel struct {
 	Type        string    `db:"type"`
 	AssetType   string    `db:"asset_type"`
 	AssetID     uuid.UUID `db:"asset_id"`
-	Field       string    `db:"field"`
+	UpdateField *string   `db:"update_field"`
 	AuthorID    uuid.UUID `db:"author_id"`
 	AuthorName  string    `db:"author_name"`
 	IsSystemLog bool      `db:"is_system_log"`
@@ -27,7 +27,7 @@ func ToNoteModel(domain dNote.Note) NoteModel {
 		Type:        string(domain.Type),
 		AssetType:   string(domain.AssetType),
 		AssetID:     domain.AssetID,
-		Field:       domain.UpdateField,
+		UpdateField: domain.UpdateField,
 		AuthorID:    domain.AuthorID,
 		AuthorName:  domain.AuthorName,
 		IsSystemLog: domain.IsSystemLog,
@@ -41,7 +41,7 @@ func (n NoteModel) ToDomain() dNote.Note {
 		Type:        dNote.NoteType(n.Type),
 		AssetType:   shared.AssetType(n.AssetType),
 		AssetID:     n.AssetID,
-		UpdateField: n.Field,
+		UpdateField: n.UpdateField,
 		AuthorID:    n.AuthorID,
 		AuthorName:  n.AuthorName,
 		IsSystemLog: n.IsSystemLog,

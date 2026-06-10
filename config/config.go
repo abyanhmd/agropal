@@ -18,12 +18,12 @@ type Config struct {
 		Log       string `yaml:"log"`
 	}
 	Database struct {
-		Host     string
-		Port     string
-		User     string
-		Password string
-		Dbname   string
-	}
+		Host     string `mapstructure:"host"`
+		Port     string `mapstructure:"port"`
+		User     string `mapstructure:"user"`
+		Password string `mapstructure:"password"`
+		Dbname   string `mapstructure:"dbname"`
+	} `mapstructure:"postgres"`
 	Redis struct {
 		Address  string
 		Password string

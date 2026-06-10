@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	dAuth "agropal/internal/domain/auth"
 	dUser "agropal/internal/domain/user"
 	"time"
 
@@ -32,7 +33,7 @@ func ToUserModel(domain dUser.User) UserModel {
 		Avatar:   domain.Account.Avatar,
 
 		Password: domain.Security.Password,
-		Role:     domain.Security.Role,
+		Role:     string(domain.Security.Role),
 
 		CreatedAt:   domain.Metadata.CreatedAt,
 		UpdatedAt:   domain.Metadata.UpdatedAt,
@@ -52,7 +53,7 @@ func (m UserModel) ToDomain() dUser.User {
 		},
 		Security: dUser.SecurityInfo{
 			Password: m.Password,
-			Role:     m.Role,
+			Role:     dAuth.Role(m.Role),
 		},
 		Metadata: dUser.UserMetadata{
 			CreatedAt:   m.CreatedAt,

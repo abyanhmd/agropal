@@ -2,6 +2,7 @@ package main
 
 import (
 	"agropal/config"
+	"agropal/internal/app"
 	"agropal/internal/domain/shared"
 	"agropal/internal/infra/database"
 	"agropal/pkg"
@@ -27,4 +28,10 @@ func main() {
 		}
 	}()
 	logger.Info(ctx, shared.System, "Connected to PostgreSQL Database")
+
+	/* Migration */
+
+	/* Toolkit */
+	toolkit := app.NewToolkit(logger, cfg, nil, db)
+	_ = app.NewContainer(toolkit)
 }

@@ -6,25 +6,30 @@ import (
 	"strconv"
 
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
 func NewPostgres(c *config.Config) *sqlx.DB {
-	port, errConvert := strconv.Atoi(c.Database.Port)
-	if errConvert != nil {
-		panic(errConvert)
+	// Convert port string to integer
+	port, err := strconv.Atoi(c.Database.Port)
+	if err != nil {
+		panic(fmt.Sprintf("invalid port: %v", err))
 	}
 
+	// Build PostgreSQL connection string
 	connection := fmt.Sprintf(
-		"host=%s port=%d user=%s dbname=%s sslmode=disable",
+		"host=%s user=%s password=%s dbname=%s port=%d sslmode=disable",
 		c.Database.Host,
-		port,
 		c.Database.User,
+		c.Database.Password,
 		c.Database.Dbname,
+		port,
 	)
 
-	db, errOpen := sqlx.Connect("postgres", connection)
-	if errOpen != nil {
-		panic(errOpen)
+	// Establish database connection
+	db, err := sqlx.Connect("postgres", connection)
+	if err != nil {
+		panic(fmt.Sprintf("failed to connect to database: %v", err))
 	}
 
 	return db
