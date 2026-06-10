@@ -2,9 +2,9 @@ package main
 
 import (
 	"agropal/config"
-	"agropal/internal/database"
 	"agropal/internal/domain/shared"
-	"agropal/internal/utils"
+	"agropal/internal/infra/database"
+	"agropal/pkg"
 	"context"
 	"fmt"
 	"strings"
@@ -15,7 +15,7 @@ func main() {
 	cfg := config.LoadConfig("./config/config.yaml")
 
 	/* Logger */
-	logger := utils.NewLogger(*cfg)
+	logger := pkg.NewLogger(*cfg)
 	ctx := context.Background()
 	logger.Info(ctx, shared.System, fmt.Sprintf("Running on %s stage", strings.ToUpper(cfg.Stage)))
 

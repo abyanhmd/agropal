@@ -1,25 +1,25 @@
 package post
 
 import (
-	"agropal/internal/database"
+	"agropal/internal/infra/database"
 	"context"
 
 	"github.com/google/uuid"
 )
 
 type Repository interface {
-	Create(ctx context.Context, q database.Querier, p Post) error
-	Update(ctx context.Context, q database.Querier, p Post) error
-	Delete(ctx context.Context, q database.Querier, id uuid.UUID) error
+	CreatePost(ctx context.Context, q database.Querier, p Post) error
+	UpdatePost(ctx context.Context, q database.Querier, p Post) error
+	DeletePost(ctx context.Context, q database.Querier, id uuid.UUID) error
 
-	FindByID(ctx context.Context, q database.Querier, id uuid.UUID) (Post, error)
-	FindBySlug(ctx context.Context, q database.Querier, slug string) (Post, error)
-	List(ctx context.Context, q database.Querier, limit, offset int) ([]Post, error)
+	FindPostByID(ctx context.Context, q database.Querier, id uuid.UUID) (Post, error)
+	FindPostBySlug(ctx context.Context, q database.Querier, slug string) (Post, error)
+	ListPosts(ctx context.Context, q database.Querier, filter FilterQuery) ([]Post, error)
 
 	AddComment(ctx context.Context, q database.Querier, c PostComment) error
-	ListTopLevel(ctx context.Context, q database.Querier, postID uuid.UUID, limit, offset int) ([]PostComment, error)
-	ListReplies(ctx context.Context, q database.Querier, parentID uuid.UUID, limit, offset int) ([]PostComment, error)
+	ListTopLevelComments(ctx context.Context, q database.Querier, postID uuid.UUID, filter FilterQuery) ([]PostComment, error)
+	ListCommentReplies(ctx context.Context, q database.Querier, parentID uuid.UUID, filter FilterQuery) ([]PostComment, error)
 
 	AddEngagement(ctx context.Context, q database.Querier, e PostEngagement) error
-	SyncCounts(ctx context.Context, q database.Querier, assetType PostType, assetID uuid.UUID) error
+	SyncPostEngagements(ctx context.Context, q database.Querier, assetType PostType, assetID uuid.UUID) error
 }

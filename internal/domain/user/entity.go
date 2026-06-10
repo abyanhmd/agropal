@@ -1,6 +1,7 @@
 package user
 
 import (
+	dAuth "agropal/internal/domain/auth"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,7 +23,7 @@ type AccountInfo struct {
 
 type SecurityInfo struct {
 	Password string
-	Role     string
+	Role     dAuth.Role
 }
 
 type UserMetadata struct {

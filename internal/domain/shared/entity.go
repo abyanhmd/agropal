@@ -18,3 +18,13 @@ const (
 	DeleteSoft DeleteType = "soft"
 	DeleteHard DeleteType = "hard"
 )
+
+type PaginationQuery struct {
+	Limit  int
+	Offset int
+}
+
+type SortQuery struct {
+	Column string
+	Dir    string
+}

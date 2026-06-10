@@ -1,15 +1,12 @@
 package auth
 
 import (
-	"agropal/internal/utils"
-
 	"github.com/google/uuid"
 )
 
-type AuthToken struct {
-	AccessToken  string
-	RefreshToken string
-	Claims       *utils.Claims
+type TokenPair struct {
+	AccessTokenStr string
+	RefreshToken   RefreshToken
 }
 
 type RefreshToken struct {
@@ -17,5 +14,14 @@ type RefreshToken struct {
 	Token     string
 	UserAgent string
 	IPAddress string
+	ExpiresAt int64
 	UserID    uuid.UUID
 }
+
+type Role string
+
+const (
+	RoleAdmin Role = "ADMIN" // System level
+	RoleUser  Role = "USER"  // Default user
+	RoleGuest Role = "GUEST" // Temporary/Viewer
+)

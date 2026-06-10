@@ -1,8 +1,10 @@
 package utils
 
 import (
+	"agropal/internal/api/middleware"
 	"agropal/internal/domain/shared"
 	"agropal/internal/response"
+	"agropal/pkg"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -11,12 +13,12 @@ import (
 )
 
 type IOHandler struct {
-	Logger   *Logger
+	Logger   *pkg.Logger
 	Registry *response.ResponseRegistry
 }
 
 func NewIOHandler(
-	logger *Logger,
+	logger *pkg.Logger,
 	registry *response.ResponseRegistry,
 ) *IOHandler {
 	return &IOHandler{
@@ -92,7 +94,7 @@ func (io *IOHandler) WriteError(ctx context.Context, w http.ResponseWriter, key 
 		detail = response.ResponseDetail{ResCode: "INTERNAL_ERROR", HTTPCode: 500, Message: "An unexpected error occurred"}
 	}
 
-	requestID := GetMetadata(ctx, ContextRequestID)
+	requestID := middleware.GetMetadata(ctx, shared.KeyRequestID)
 
 	io.respond(ctx, w, detail.HTTPCode, StandardEnvelope{
 		Info: InfoEnvelope{
@@ -130,7 +132,7 @@ func (io *IOHandler) IdentifierFromPathValue(r *http.Request, key string) (uuid.
 func (io *IOHandler) HandleServiceError(ctx context.Context, w http.ResponseWriter, errorKey error) {
 	var envelope StandardEnvelope
 
-	requestID := GetMetadata(ctx, ContextRequestID)
+	requestID := middleware.GetMetadata(ctx, shared.KeyRequestID)
 
 	detail, ok := io.Registry.GetErrorRegistry(errorKey)
 	if !ok {

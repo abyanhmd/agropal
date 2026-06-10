@@ -19,10 +19,10 @@ type Handler struct {
 
 func NewHandler(tool utils.IOHandler, service *Application) *Handler {
 	return &Handler{
-		User:    user.NewHandler(tool, service.User),
-		Farm:    farm.NewHandler(tool, service.Farm),
-		Weather: weather.NewHandler(tool, service.Weather),
-		Product: product.NewHandler(tool, service.Product),
+		User:    user.NewHandler(tool, service.UserService),
+		Farm:    farm.NewHandler(tool, service.FarmService),
+		Weather: weather.NewHandler(tool, service.WeatherService),
+		Product: product.NewHandler(tool, service.ProductService),
 		//Transaction: transaction.NewHandler(tool, service.Transaction),
 		//Post:        post.NewHandler(tool, service.Post),
 	}

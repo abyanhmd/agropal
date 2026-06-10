@@ -17,29 +17,29 @@ import (
 	rTransaction "agropal/internal/repository/transaction"
 	rUser "agropal/internal/repository/user"
 	rWeather "agropal/internal/repository/weather"
-	"agropal/internal/utils"
+	"agropal/pkg"
 )
 
 type Repository struct {
-	Auth        dAuth.Repository
-	User        dUser.Repository
-	Note        dNote.Repository
-	Farm        dFarm.Repository
-	Weather     dWeather.Repository
-	Product     dProduct.Repository
-	Transaction dTransaction.Repository
-	Post        dPost.Repository
+	AuthRepo        dAuth.Repository
+	UserRepo        dUser.Repository
+	NoteRepo        dNote.Repository
+	FarmRepo        dFarm.Repository
+	WeatherRepo     dWeather.Repository
+	ProductRepo     dProduct.Repository
+	TransactionRepo dTransaction.Repository
+	PostRepo        dPost.Repository
 }
 
-func NewRepository(logger *utils.Logger) *Repository {
+func NewRepository(logger *pkg.Logger) *Repository {
 	return &Repository{
-		Auth:        rAuth.NewRepository(logger),
-		User:        rUser.NewRepository(logger),
-		Note:        rNote.NewRepository(logger),
-		Farm:        rFarm.NewRepository(logger),
-		Weather:     rWeather.NewRepository(logger),
-		Product:     rProduct.NewRepository(logger),
-		Transaction: rTransaction.NewRepository(logger),
-		Post:        rPost.NewRepository(logger),
+		AuthRepo:        rAuth.NewRepository(logger),
+		UserRepo:        rUser.NewRepository(logger),
+		NoteRepo:        rNote.NewRepository(logger),
+		FarmRepo:        rFarm.NewRepository(logger),
+		WeatherRepo:     rWeather.NewRepository(logger),
+		ProductRepo:     rProduct.NewRepository(logger),
+		TransactionRepo: rTransaction.NewRepository(logger),
+		PostRepo:        rPost.NewRepository(logger),
 	}
 }

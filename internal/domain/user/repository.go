@@ -1,8 +1,8 @@
 package user
 
 import (
-	"agropal/internal/database"
 	"agropal/internal/domain/shared"
+	"agropal/internal/infra/database"
 	"context"
 	"time"
 
@@ -10,14 +10,15 @@ import (
 )
 
 type Repository interface {
-	Create(ctx context.Context, q database.Querier, user User) error
-	FindByID(ctx context.Context, q database.Querier, userID uuid.UUID) (User, error)
-	List(ctx context.Context, q database.Querier) ([]User, error)
-	Update(ctx context.Context, q database.Querier, user User) error
-	UpdatePassword(ctx context.Context, q database.Querier, userID uuid.UUID, password string) error
+	CreateUser(ctx context.Context, q database.Querier, user User) error
+	FindUserByID(ctx context.Context, q database.Querier, userID uuid.UUID) (User, error)
+	FindUserByEmail(ctx context.Context, q database.Querier, email string) (User, error)
+	ListUsers(ctx context.Context, q database.Querier) ([]User, error)
+	UpdateUser(ctx context.Context, q database.Querier, user User) error
+	UpdateUserPassword(ctx context.Context, q database.Querier, userID uuid.UUID, password string) error
 
-	SoftDelete(ctx context.Context, q database.Querier, userID uuid.UUID, deletedAt time.Time) error
-	Delete(ctx context.Context, q database.Querier, userID uuid.UUID) error
+	SoftDeleteUser(ctx context.Context, q database.Querier, userID uuid.UUID, deletedAt time.Time) error
+	DeleteUser(ctx context.Context, q database.Querier, userID uuid.UUID) error
 
-	ListByAsset(ctx context.Context, q database.Querier, assetType shared.AssetType, assetID uuid.UUID) ([]User, error)
+	ListUsersByAsset(ctx context.Context, q database.Querier, assetType shared.AssetType, assetID uuid.UUID) ([]User, error)
 }

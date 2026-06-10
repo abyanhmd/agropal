@@ -1,6 +1,7 @@
 package post
 
 import (
+	"agropal/internal/domain/shared"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,10 +19,10 @@ type Post struct {
 	Content string
 	Slug    string
 
-	CommentCount int
 	LikeCount    int
 	DislikeCount int
 	ViewCount    int
+	CommentCount int
 
 	CreatedAt time.Time
 	UpdatedAt *time.Time
@@ -64,3 +65,10 @@ const (
 	ActionDislike ActionType = "DISLIKE"
 	ActionView    ActionType = "VIEW"
 )
+
+type FilterQuery struct {
+	UserID     *uuid.UUID
+	Slug       *string
+	Pagination *shared.PaginationQuery
+	Sorting    *shared.SortQuery
+}
