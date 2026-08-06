@@ -8,6 +8,5 @@ type UserResponse struct {
 	Email    string    `json:"email"`
 	Username string    `json:"username"`
 	Avatar   string    `json:"avatar"`
-	Password string    `json:"password"`
 	Role     string    `json:"role"`
 }

@@ -1,9 +1,7 @@
 package request
 
 import (
-	aWeather "agropal/internal/application/weather"
-
-	"github.com/google/uuid"
+	aWeather "agropal/internal/app/weather"
 )
 
 type WeatherRequest struct {
@@ -11,10 +9,9 @@ type WeatherRequest struct {
 	Latitude  float64 `json:"latitude"`
 }
 
-func (r *WeatherRequest) ToCommand(farmID uuid.UUID) aWeather.WeatherCommand {
+func (r *WeatherRequest) ToCommand() aWeather.WeatherCommand {
 	return aWeather.WeatherCommand{
 		Longitude: r.Longitude,
 		Latitude:  r.Latitude,
-		FarmID:    farmID,
 	}
 }

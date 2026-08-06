@@ -49,10 +49,13 @@ func NewToolkit(
 }
 
 type Container struct {
+	JWT dAuth.TokenProvider
+
 	Auth        *AuthModule
 	User        *UserModule
 	Farm        *FarmModule
 	Weather     *WeatherModule
+	Product     *ProductModule
 	Post        *PostModule
 	Transaction *TransactionModule
 }
@@ -110,14 +113,17 @@ func NewContainer(
 	userService := aUser.NewService(transactor, userRepo, noteRepo)
 	farmService := aFarm.NewService(transactor, userRepo, farmRepo)
 	weatherService := aWeather.NewService(transactor, userRepo, farmRepo, weatherRepo)
+	productService := aProduct.NewService(transactor, userRepo, farmRepo, productRepo, noteRepo)
 	postService := aPost.NewService(transactor, userRepo, postRepo, noteRepo)
 	transactionService := aTransaction.NewService(transactor, userRepo, farmRepo, productRepo, transactionRepo)
 
 	return &Container{
+		JWT:         jwt,
 		Auth:        &AuthModule{Service: authService},
 		User:        &UserModule{Service: userService},
 		Farm:        &FarmModule{Service: farmService},
 		Weather:     &WeatherModule{Service: weatherService},
+		Product:     &ProductModule{Service: productService},
 		Post:        &PostModule{Service: postService},
 		Transaction: &TransactionModule{Service: transactionService},
 	}

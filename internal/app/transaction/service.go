@@ -106,12 +106,81 @@ func (s *Service) Delete(ctx context.Context, farmID, productID uuid.UUID, trans
 	return s.transactionRepo.DeleteTransactions(ctx, s.transactor.DB(), productID, transactionIDs)
 }
 
+// DeleteMany deletes an arbitrary set of transactions, verifying that the
+// requester owns (or administers) the farm behind each transaction's product
+// before removing it. Deletes are grouped per product to match the
+// repository's per-product delete contract.
 func (s *Service) DeleteMany(ctx context.Context, transactionIDs []uuid.UUID) error {
-	panic("implement me")
+	db := s.transactor.DB()
+	byProduct := make(map[uuid.UUID][]uuid.UUID)
+	verifiedProducts := make(map[uuid.UUID]bool)
+
+	for _, transactionID := range transactionIDs {
+		transaction, err := s.transactionRepo.FindTransactionByID(ctx, db, transactionID)
+		if err != nil {
+			return err
+		}
+		if transaction == (dTransaction.Transaction{}) {
+			return dTransaction.ErrInvalidID
+		}
+
+		if !verifiedProducts[transaction.ProductID] {
+			product, err := s.productRepo.FindProductByID(ctx, db, transaction.ProductID)
+			if err != nil {
+				return err
+			}
+			if err = s.verifyProduct(ctx, product.FarmID, product.ID); err != nil {
+				return err
+			}
+			verifiedProducts[transaction.ProductID] = true
+		}
+
+		byProduct[transaction.ProductID] = append(byProduct[transaction.ProductID], transactionID)
+	}
+
+	for productID, ids := range byProduct {
+		if err := s.transactionRepo.DeleteTransactions(ctx, db, productID, ids); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
+// DeleteAll deletes every transaction across every farm owned by the
+// requesting user.
 func (s *Service) DeleteAll(ctx context.Context) error {
-	panic("implement me")
+	userID, err := shared.ExtractUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	db := s.transactor.DB()
+
+	farms, err := s.farmRepo.ListFarmByUserID(ctx, db, userID)
+	if err != nil {
+		return err
+	}
+
+	for _, farm := range farms {
+		transactions, err := s.transactionRepo.ListTransactionsByFarmID(ctx, db, farm.ID)
+		if err != nil {
+			return err
+		}
+
+		byProduct := make(map[uuid.UUID][]uuid.UUID)
+		for _, transaction := range transactions {
+			byProduct[transaction.ProductID] = append(byProduct[transaction.ProductID], transaction.ID)
+		}
+
+		for productID, ids := range byProduct {
+			if err = s.transactionRepo.DeleteTransactions(ctx, db, productID, ids); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *Service) verifyProduct(ctx context.Context, farmID, productID uuid.UUID) error {

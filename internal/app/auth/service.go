@@ -7,10 +7,14 @@ import (
 	"agropal/internal/infra/database"
 	"agropal/internal/infra/identity"
 	"context"
+	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
+
+const passwordResetTokenTTL = 15 * time.Minute
 
 type Service struct {
 	transactor database.Transactor
@@ -189,16 +193,79 @@ func (s *Service) Invalidate(ctx context.Context, refreshID string) error {
 
 /* ==================== Recovery ====================== */
 
-func (s *Service) RequestPasswordReset(ctx context.Context, email string) error {
-	return nil
+// RequestPasswordReset issues a single-use reset token for the given email,
+// stored via the refresh token repository (ExpiresAt enforces its lifetime).
+// It returns an empty token without error when the email is unknown, to
+// avoid leaking account existence to the caller.
+func (s *Service) RequestPasswordReset(ctx context.Context, email string) (string, error) {
+	user, err := s.userRepo.FindUserByEmail(ctx, s.transactor.DB(), email)
+	if err != nil {
+		if errors.Is(err, dUser.ErrNotFound) {
+			return "", nil
+		}
+		return "", err
+	}
+
+	resetToken, err := s.generator.GenerateHexID()
+	if err != nil {
+		return "", err
+	}
+
+	token := dAuth.RefreshToken{
+		ID:        resetToken,
+		UserAgent: shared.GetMetadata(ctx, shared.KeyUserAgent),
+		IPAddress: shared.GetMetadata(ctx, shared.KeyIPAddress),
+		ExpiresAt: time.Now().UTC().Add(passwordResetTokenTTL).Unix(),
+		UserID:    user.ID,
+	}
+
+	if err = s.authRepo.CreateRefreshToken(ctx, s.transactor.DB(), token); err != nil {
+		return "", err
+	}
+
+	return resetToken, nil
 }
 
 func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) error {
-	return nil
+	return s.transactor.WithTx(ctx, func(q database.Querier) error {
+		storedToken, err := s.authRepo.GetRefreshToken(ctx, q, token)
+		if err != nil {
+			return dAuth.ErrPasswordResetInvalid
+		}
+
+		if time.Now().UTC().Unix() > storedToken.ExpiresAt {
+			_ = s.authRepo.DeleteRefreshToken(ctx, q, token)
+			return dAuth.ErrPasswordResetExpired
+		}
+
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+
+		if err = s.userRepo.UpdateUserPassword(ctx, q, storedToken.UserID, string(hashedPassword)); err != nil {
+			return err
+		}
+
+		return s.authRepo.DeleteRefreshToken(ctx, q, token)
+	})
 }
 
-/* ==================== Recovery ====================== */
+/* ==================== Authorization ====================== */
 
 func (s *Service) Authorize(ctx context.Context, userID uuid.UUID, requiredRole string) error {
+	user, err := s.userRepo.FindUserByID(ctx, s.transactor.DB(), userID)
+	if err != nil {
+		return err
+	}
+
+	if user.Security.Role == dAuth.RoleAdmin {
+		return nil
+	}
+
+	if requiredRole != "" && string(user.Security.Role) != requiredRole {
+		return shared.ErrForbidden
+	}
+
 	return nil
 }

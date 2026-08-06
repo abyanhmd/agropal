@@ -1,7 +1,7 @@
 package farm
 
 import (
-	"agropal/internal/interface/middleware"
+	"agropal/internal/api/middleware"
 	"net/http"
 )
 
@@ -11,7 +11,6 @@ type Router struct {
 
 func NewRouter(
 	mux *http.ServeMux,
-	m *middleware.Middleware,
 	stack middleware.HandlerMiddleware,
 	handler Handler,
 ) *Router {

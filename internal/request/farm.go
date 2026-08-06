@@ -1,18 +1,15 @@
 package request
 
 import (
-	aFarm "agropal/internal/application/farm"
-
-	"github.com/google/uuid"
+	aFarm "agropal/internal/app/farm"
 )
 
 type FarmRequest struct {
 	Name string `json:"name"`
 }
 
-func (r *FarmRequest) ToCommand(userID uuid.UUID) aFarm.FarmCommand {
+func (r *FarmRequest) ToCommand() aFarm.FarmCommand {
 	return aFarm.FarmCommand{
-		UserID: userID,
-		Name:   r.Name,
+		Name: r.Name,
 	}
 }

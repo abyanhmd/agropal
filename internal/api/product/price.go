@@ -1,8 +1,9 @@
 package product
 
 import (
+	dProduct "agropal/internal/domain/product"
+	"agropal/internal/domain/shared"
 	"agropal/internal/request"
-	"agropal/internal/response"
 	"net/http"
 )
 
@@ -11,65 +12,36 @@ func (h *Handler) CreateProductPrice(w http.ResponseWriter, r *http.Request) {
 
 	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(ctx, w, dProduct.ErrInvalidFarmID, nil)
 		return
 	}
 
 	productID, err := h.IoHandler.IdentifierFromPathValue(r, "product_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(ctx, w, dProduct.ErrInvalidID, nil)
 		return
 	}
 
 	var req request.ProductPriceRequest
 	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
 	}
-	cmd := req.ToCommand(productID)
-
-	if err = h.ProductService.CreateProductPrice(ctx, farmID, productID, cmd); err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+	if req.Price == nil {
+		h.IoHandler.WriteError(ctx, w, dProduct.ErrInvalidPriceAmount, nil)
 		return
 	}
-
-	h.IoHandler.WriteSuccess(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, nil)
-}
-
-func (h *Handler) UpdateProductPrice(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
-	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+	if req.DateAdded == nil {
+		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
 	}
 
-	productID, err := h.IoHandler.IdentifierFromPathValue(r, "product_id")
-	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+	if err = h.ProductService.CreateProductPrice(ctx, farmID, productID, req.ToCommand()); err != nil {
+		h.IoHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	priceID, err := h.IoHandler.IdentifierFromPathValue(r, "price_id")
-	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
-		return
-	}
-
-	var req request.ProductPriceRequest
-	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, err)
-		return
-	}
-	cmd := req.ToCommand(productID)
-
-	if err = h.ProductService.UpdateProductPrice(ctx, farmID, productID, priceID, cmd); err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
-		return
-	}
-
-	h.IoHandler.WriteSuccess(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, nil)
+	h.IoHandler.WriteResponseBody(w, http.StatusCreated, nil)
 }
 
 func (h *Handler) DeleteProductPrice(w http.ResponseWriter, r *http.Request) {
@@ -77,14 +49,14 @@ func (h *Handler) DeleteProductPrice(w http.ResponseWriter, r *http.Request) {
 
 	priceID, err := h.IoHandler.IdentifierFromPathValue(r, "price_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(ctx, w, dProduct.ErrInvalidPriceID, nil)
 		return
 	}
 
 	if err = h.ProductService.DeleteProductPrice(ctx, priceID); err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, nil)
+	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
 }

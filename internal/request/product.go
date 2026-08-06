@@ -1,51 +1,55 @@
 package request
 
 import (
-	aProduct "agropal/internal/application/product"
+	aProduct "agropal/internal/app/product"
 	dProduct "agropal/internal/domain/product"
 	"time"
-
-	"github.com/google/uuid"
 )
 
+// ProductRequest fields are pointers so the same struct can back both the
+// create endpoint (all fields required, validated by the handler) and the
+// partial-update endpoint (only the supplied fields are considered).
 type ProductRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Image       string `json:"image"`
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	Image       *string `json:"image"`
 }
 
-func (p *ProductRequest) ToCommand(farmID uuid.UUID) aProduct.ProductCommand {
+func (p *ProductRequest) ToCommand() aProduct.ProductCommand {
 	return aProduct.ProductCommand{
 		Name:        p.Name,
 		Description: p.Description,
 		Image:       p.Image,
-		FarmID:      farmID,
 	}
 }
 
 type ProductStockRequest struct {
-	DateAdded time.Time `json:"date_added"`
-	Type      string    `json:"type"`
-	Stock     float64   `json:"stock"`
+	DateAdded *time.Time `json:"date_added"`
+	Type      *string    `json:"type"`
+	Stock     *float64   `json:"stock"`
 }
 
-func (p *ProductStockRequest) ToCommand(productID uuid.UUID) aProduct.ProductStockCommand {
+func (p *ProductStockRequest) ToCommand() aProduct.ProductStockCommand {
+	var movementType *dProduct.StockMovementType
+	if p.Type != nil {
+		mt := dProduct.StockMovementType(*p.Type)
+		movementType = &mt
+	}
+
 	return aProduct.ProductStockCommand{
-		ProductID: productID,
 		DateAdded: p.DateAdded,
-		Type:      dProduct.StockMovementType(p.Type),
+		Type:      movementType,
 		Stock:     p.Stock,
 	}
 }
 
 type ProductPriceRequest struct {
-	DateAdded time.Time `json:"date_added"`
-	Price     float64   `json:"price"`
+	DateAdded *time.Time `json:"date_added"`
+	Price     *float64   `json:"price"`
 }
 
-func (p *ProductPriceRequest) ToCommand(productID uuid.UUID) aProduct.ProductPriceCommand {
+func (p *ProductPriceRequest) ToCommand() aProduct.ProductPriceCommand {
 	return aProduct.ProductPriceCommand{
-		ProductID: productID,
 		DateAdded: p.DateAdded,
 		Price:     p.Price,
 	}

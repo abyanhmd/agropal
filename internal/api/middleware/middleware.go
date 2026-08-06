@@ -1,25 +1,27 @@
 package middleware
 
 import (
-	"agropal/internal/infra/crypto"
-	"agropal/pkg"
+	dAuth "agropal/internal/domain/auth"
+	"agropal/internal/domain/shared"
+	"agropal/internal/utils"
 	"net/http"
+	"strings"
 )
 
 type HandlerMiddleware func(handler http.Handler) http.Handler
 
 type Middleware struct {
-	logger *pkg.Logger
-	jwt    *crypto.JWTProvider
+	ioHandler *utils.IOHandler
+	jwt       dAuth.TokenProvider
 }
 
 func NewMiddleware(
-	l *pkg.Logger,
-	jwt *crypto.JWTProvider,
+	ioHandler *utils.IOHandler,
+	jwt dAuth.TokenProvider,
 ) *Middleware {
 	return &Middleware{
-		logger: l,
-		jwt:    jwt,
+		ioHandler: ioHandler,
+		jwt:       jwt,
 	}
 }
 
@@ -28,4 +30,30 @@ func Chain(handler http.Handler, xs ...HandlerMiddleware) http.Handler {
 		handler = m(handler)
 	}
 	return handler
+}
+
+// RequireAuth validates the Authorization bearer token and, on success,
+// injects the caller's claims into the request context via the same
+// metadata keys the app layer reads with shared.ExtractUserID /
+// shared.GetMetadata.
+func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		authHeader := r.Header.Get("Authorization")
+		token, ok := strings.CutPrefix(authHeader, "Bearer ")
+		if authHeader == "" || !ok || token == "" {
+			m.ioHandler.WriteError(ctx, w, dAuth.ErrUnauthorized, nil)
+			return
+		}
+
+		claims, err := m.jwt.ValidateToken(ctx, shared.TypeAccess, token)
+		if err != nil {
+			m.ioHandler.WriteError(ctx, w, dAuth.ErrTokenInvalid, nil)
+			return
+		}
+
+		ctx = shared.SaveContextFromRequest(r, &claims)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

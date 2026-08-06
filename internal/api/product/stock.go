@@ -1,8 +1,9 @@
 package product
 
 import (
+	dProduct "agropal/internal/domain/product"
+	"agropal/internal/domain/shared"
 	"agropal/internal/request"
-	"agropal/internal/response"
 	"net/http"
 )
 
@@ -11,65 +12,40 @@ func (h *Handler) CreateProductStock(w http.ResponseWriter, r *http.Request) {
 
 	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(ctx, w, dProduct.ErrInvalidFarmID, nil)
 		return
 	}
 
 	productID, err := h.IoHandler.IdentifierFromPathValue(r, "product_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(ctx, w, dProduct.ErrInvalidID, nil)
 		return
 	}
 
 	var req request.ProductStockRequest
 	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
 	}
-	cmd := req.ToCommand(productID)
-
-	if err = h.ProductService.CreateProductStock(ctx, farmID, productID, cmd); err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+	if req.Stock == nil {
+		h.IoHandler.WriteError(ctx, w, dProduct.ErrInvalidStockAmount, nil)
 		return
 	}
-
-	h.IoHandler.WriteSuccess(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, nil)
-}
-
-func (h *Handler) UpdateProductStock(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
-	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+	if req.Type == nil {
+		h.IoHandler.WriteError(ctx, w, dProduct.ErrInvalidStockType, nil)
+		return
+	}
+	if req.DateAdded == nil {
+		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
 	}
 
-	productID, err := h.IoHandler.IdentifierFromPathValue(r, "product_id")
-	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+	if err = h.ProductService.CreateProductStock(ctx, farmID, productID, req.ToCommand()); err != nil {
+		h.IoHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	priceID, err := h.IoHandler.IdentifierFromPathValue(r, "price_id")
-	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
-		return
-	}
-
-	var req request.ProductStockRequest
-	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, err)
-		return
-	}
-	cmd := req.ToCommand(productID)
-
-	if err = h.ProductService.UpdateProductStock(ctx, farmID, productID, priceID, cmd); err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
-		return
-	}
-
-	h.IoHandler.WriteSuccess(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, nil)
+	h.IoHandler.WriteResponseBody(w, http.StatusCreated, nil)
 }
 
 func (h *Handler) DeleteProductStock(w http.ResponseWriter, r *http.Request) {
@@ -77,14 +53,14 @@ func (h *Handler) DeleteProductStock(w http.ResponseWriter, r *http.Request) {
 
 	stockID, err := h.IoHandler.IdentifierFromPathValue(r, "stock_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(ctx, w, dProduct.ErrInvalidStockID, nil)
 		return
 	}
 
 	if err = h.ProductService.DeleteProductStock(ctx, stockID); err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(r.Context(), w, response.AUTH_INVALID_CREDENTIALS, nil)
+	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
 }

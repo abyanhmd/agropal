@@ -1,24 +1,23 @@
 package farm
 
 import (
-	"agropal/internal/api/middleware"
-	"agropal/internal/application/farm"
+	aFarm "agropal/internal/app/farm"
+	dFarm "agropal/internal/domain/farm"
+	"agropal/internal/domain/shared"
 	"agropal/internal/request"
 	"agropal/internal/response"
 	"agropal/internal/utils"
 	"net/http"
-
-	"github.com/google/uuid"
 )
 
 type Handler struct {
-	IoHandler   utils.IOHandler
-	FarmService farm.Service
+	IoHandler   *utils.IOHandler
+	FarmService *aFarm.Service
 }
 
 func NewHandler(
-	ioHandler utils.IOHandler,
-	farmService farm.Service,
+	ioHandler *utils.IOHandler,
+	farmService *aFarm.Service,
 ) Handler {
 	return Handler{
 		IoHandler:   ioHandler,
@@ -31,37 +30,34 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var req request.FarmRequest
 	if err := h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+		return
+	}
+	if req.Name == "" {
+		h.IoHandler.WriteError(ctx, w, dFarm.ErrInvalidName, nil)
 		return
 	}
 
-	userID, err := middleware.ExtractUserID(ctx)
-	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
-		return
-	}
-	cmd := req.ToCommand(userID)
-
-	if err = h.FarmService.Create(ctx, cmd); err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+	if err := h.FarmService.Create(ctx, req.ToCommand()); err != nil {
+		h.IoHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, response.AUTH_INVALID_CREDENTIALS, nil)
+	h.IoHandler.WriteResponseBody(w, http.StatusCreated, nil)
 }
 
 func (h *Handler) GetOne(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := getIdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(ctx, w, dFarm.ErrInvalidID, nil)
 		return
 	}
 
 	result, err := h.FarmService.GetOne(ctx, farmID)
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
@@ -73,7 +69,7 @@ func (h *Handler) GetMany(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.FarmService.GetMany(ctx)
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
@@ -88,54 +84,39 @@ func (h *Handler) GetMany(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := getIdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(ctx, w, dFarm.ErrInvalidID, nil)
 		return
 	}
 
 	var req request.FarmRequest
-	if err := h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
-		return
-	}
-	cmd := req.ToCommand(farmID)
-
-	if err = h.FarmService.Update(ctx, farmID, cmd); err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
+		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, response.AUTH_INVALID_CREDENTIALS, nil)
+	if err = h.FarmService.Update(ctx, farmID, req.ToCommand()); err != nil {
+		h.IoHandler.HandleServiceError(ctx, w, err)
+		return
+	}
+
+	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := getIdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.WriteError(ctx, w, dFarm.ErrInvalidID, nil)
 		return
 	}
 
 	if err = h.FarmService.Delete(ctx, farmID); err != nil {
-		h.IoHandler.WriteError(ctx, w, response.AUTH_INVALID_CREDENTIALS, err)
+		h.IoHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, response.AUTH_INVALID_CREDENTIALS, nil)
-}
-
-func getIdentifierFromPathValue(r *http.Request, key string) (uuid.UUID, error) {
-	idStr := r.PathValue(key)
-	if idStr == "" {
-		return uuid.Nil, nil
-	}
-
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		return uuid.Nil, err
-	}
-
-	return id, nil
+	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
 }

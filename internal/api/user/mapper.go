@@ -8,11 +8,10 @@ import (
 func DomainToUserResponse(domain dUser.User) response.UserResponse {
 	return response.UserResponse{
 		UserID:   domain.ID,
-		Name:     domain.Name,
-		Email:    domain.Email,
-		Username: domain.Username,
-		Avatar:   domain.Avatar,
-		Password: domain.Password,
-		Role:     domain.Role,
+		Name:     domain.Account.Name,
+		Email:    domain.Account.Email,
+		Username: domain.Account.Username,
+		Avatar:   domain.Account.Avatar,
+		Role:     string(domain.Security.Role),
 	}
 }

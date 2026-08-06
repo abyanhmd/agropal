@@ -1,7 +1,7 @@
 package user
 
 import (
-	"agropal/internal/interface/middleware"
+	"agropal/internal/api/middleware"
 	"net/http"
 )
 
@@ -11,7 +11,6 @@ type Router struct {
 
 func NewRouter(
 	mux *http.ServeMux,
-	m *middleware.Middleware,
 	stack middleware.HandlerMiddleware,
 	handler Handler,
 ) *Router {
@@ -27,6 +26,12 @@ func NewRouter(
 			Path:        "/user/{user_id}",
 			Method:      http.MethodPatch,
 			Handler:     handler.Update,
+			Middlewares: []middleware.HandlerMiddleware{},
+		},
+		{
+			Path:        "/user/{user_id}/password",
+			Method:      http.MethodPatch,
+			Handler:     handler.ChangePassword,
 			Middlewares: []middleware.HandlerMiddleware{},
 		},
 		{
