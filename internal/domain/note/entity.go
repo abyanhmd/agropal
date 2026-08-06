@@ -17,8 +17,9 @@ type Note struct {
 	AuthorName string
 
 	UpdateField *string
-	OldValue    *string
-	NewValue    *string
+
+	OldValue *string
+	NewValue *string
 
 	IsSystemLog bool
 }
@@ -26,9 +27,9 @@ type Note struct {
 type NoteType string
 
 const (
-	TypeCreate  NoteType = "CREATE"
-	TypeUpdate  NoteType = "UPDATE"
-	TypeArchive NoteType = "ARCHIVE"
-	TypeDelete  NoteType = "DELETE"
-	TypeMerge   NoteType = "MERGE"
+	TypeCreate  NoteType = "create"
+	TypeUpdate  NoteType = "update"
+	TypeArchive NoteType = "archive"
+	TypeDelete  NoteType = "delete"
+	TypeMerge   NoteType = "merge"
 )

@@ -7,7 +7,7 @@ import (
 
 func DomainToWeatherResponse(weather dWeather.Weather) response.WeatherResponse {
 	return response.WeatherResponse{
-		WeatherID: weather.WeatherID,
+		WeatherID: weather.LocationID,
 		Longitude: weather.Longitude,
 		Latitude:  weather.Latitude,
 		FarmID:    weather.FarmID,

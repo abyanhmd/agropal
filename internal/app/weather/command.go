@@ -17,9 +17,9 @@ type WeatherCommand struct {
 
 func (c WeatherCommand) ToDomain(weatherID, farmID uuid.UUID) dWeather.Weather {
 	return dWeather.Weather{
-		WeatherID: weatherID,
-		Longitude: c.Longitude,
-		Latitude:  c.Latitude,
-		FarmID:    farmID,
+		LocationID: weatherID,
+		Longitude:  c.Longitude,
+		Latitude:   c.Latitude,
+		FarmID:     farmID,
 	}
 }

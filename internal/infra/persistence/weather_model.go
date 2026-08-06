@@ -7,7 +7,7 @@ import (
 )
 
 type WeatherModel struct {
-	ID        uuid.UUID `db:"weather_id"`
+	ID        uuid.UUID `db:"location_id"`
 	Longitude float64   `db:"longitude"`
 	Latitude  float64   `db:"latitude"`
 	FarmID    uuid.UUID `db:"farm_id"`
@@ -15,7 +15,7 @@ type WeatherModel struct {
 
 func ToWeatherModel(domain dWeather.Weather) WeatherModel {
 	return WeatherModel{
-		ID:        domain.WeatherID,
+		ID:        domain.LocationID,
 		Longitude: domain.Longitude,
 		Latitude:  domain.Latitude,
 		FarmID:    domain.FarmID,
@@ -24,9 +24,9 @@ func ToWeatherModel(domain dWeather.Weather) WeatherModel {
 
 func (m WeatherModel) ToDomain() dWeather.Weather {
 	return dWeather.Weather{
-		WeatherID: m.ID,
-		Longitude: m.Longitude,
-		Latitude:  m.Latitude,
-		FarmID:    m.FarmID,
+		LocationID: m.ID,
+		Longitude:  m.Longitude,
+		Latitude:   m.Latitude,
+		FarmID:     m.FarmID,
 	}
 }
