@@ -1,18 +1,20 @@
 package transaction
 
-import "agropal/internal/response"
+import (
+	"agropal/internal/domain/shared"
+)
 
 var (
-	ErrNotFound response.ErrorKey = "TRANSACTION.NOT_FOUND"
+	ErrNotFound shared.ErrorKey = "TRANSACTION.NOT_FOUND"
 
-	ErrInvalidID          response.ErrorKey = "TRANSACTION.INVALID_ID"
-	ErrInvalidType        response.ErrorKey = "TRANSACTION.INVALID_TYPE"
-	ErrInvalidAmount      response.ErrorKey = "TRANSACTION.INVALID_AMOUNT"
-	ErrInvalidCurrency    response.ErrorKey = "TRANSACTION.INVALID_CURRENCY"
-	ErrInvalidDescription response.ErrorKey = "TRANSACTION.INVALID_DESCRIPTION"
-	ErrInvalidProductID   response.ErrorKey = "TRANSACTION.INVALID_PRODUCT_ID"
+	ErrInvalidID          shared.ErrorKey = "TRANSACTION.INVALID_ID"
+	ErrInvalidType        shared.ErrorKey = "TRANSACTION.INVALID_TYPE"
+	ErrInvalidAmount      shared.ErrorKey = "TRANSACTION.INVALID_AMOUNT"
+	ErrInvalidCurrency    shared.ErrorKey = "TRANSACTION.INVALID_CURRENCY"
+	ErrInvalidDescription shared.ErrorKey = "TRANSACTION.INVALID_DESCRIPTION"
+	ErrInvalidProductID   shared.ErrorKey = "TRANSACTION.INVALID_PRODUCT_ID"
 
-	ErrCreateFailed response.ErrorKey = "TRANSACTION.CREATE_FAILED"
-	ErrUpdateFailed response.ErrorKey = "TRANSACTION.UPDATE_FAILED"
-	ErrDeleteFailed response.ErrorKey = "TRANSACTION.DELETE_FAILED"
+	ErrCreateFailed shared.ErrorKey = "TRANSACTION.CREATE_FAILED"
+	ErrUpdateFailed shared.ErrorKey = "TRANSACTION.UPDATE_FAILED"
+	ErrDeleteFailed shared.ErrorKey = "TRANSACTION.DELETE_FAILED"
 )

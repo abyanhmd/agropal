@@ -1,18 +1,20 @@
 package note
 
-import "agropal/internal/response"
+import (
+	"agropal/internal/domain/shared"
+)
 
 var (
-	ErrNotFound response.ErrorKey = "NOTE.NOT_FOUND"
+	ErrNotFound shared.ErrorKey = "NOTE.NOT_FOUND"
 
-	ErrMissingNoteID    response.ErrorKey = "NOTE.MISSING_NOTE_ID"
-	ErrInvalidNoteID    response.ErrorKey = "NOTE.INVALID_NOTE_ID"
-	ErrInvalidType      response.ErrorKey = "NOTE.INVALID_TYPE"
-	ErrInvalidAssetType response.ErrorKey = "NOTE.INVALID_ASSET_TYPE"
-	ErrInvalidAssetID   response.ErrorKey = "NOTE.INVALID_ASSET_ID"
-	ErrInvalidAuthorID  response.ErrorKey = "NOTE.INVALID_AUTHOR_ID"
+	ErrMissingNoteID    shared.ErrorKey = "NOTE.MISSING_NOTE_ID"
+	ErrInvalidNoteID    shared.ErrorKey = "NOTE.INVALID_NOTE_ID"
+	ErrInvalidType      shared.ErrorKey = "NOTE.INVALID_TYPE"
+	ErrInvalidAssetType shared.ErrorKey = "NOTE.INVALID_ASSET_TYPE"
+	ErrInvalidAssetID   shared.ErrorKey = "NOTE.INVALID_ASSET_ID"
+	ErrInvalidAuthorID  shared.ErrorKey = "NOTE.INVALID_AUTHOR_ID"
 
-	ErrCreateFailed response.ErrorKey = "NOTE.CREATE_FAILED"
-	ErrUpdateFailed response.ErrorKey = "NOTE.UPDATE_FAILED"
-	ErrDeleteFailed response.ErrorKey = "NOTE.DELETE_FAILED"
+	ErrCreateFailed shared.ErrorKey = "NOTE.CREATE_FAILED"
+	ErrUpdateFailed shared.ErrorKey = "NOTE.UPDATE_FAILED"
+	ErrDeleteFailed shared.ErrorKey = "NOTE.DELETE_FAILED"
 )

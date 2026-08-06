@@ -17,6 +17,12 @@ type CreateUserCommand struct {
 	Avatar   *string
 }
 
+type LoginUserCommand struct {
+	Email    *string
+	Username *string
+	Password string
+}
+
 type ChangePasswordCommand struct {
 	UserID      uuid.UUID
 	OldPassword string

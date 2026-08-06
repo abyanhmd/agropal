@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"agropal/internal/api/middleware"
 	"agropal/internal/domain/shared"
 	"agropal/internal/response"
 	"agropal/pkg"
@@ -70,8 +69,8 @@ func (io *IOHandler) WriteResponseBody(w http.ResponseWriter, statusCode int, re
 }
 
 // WriteSuccess handles successful API responses with generics
-func (io *IOHandler) WriteSuccess(ctx context.Context, w http.ResponseWriter, key string, data any) {
-	detail, ok := io.Registry.GetSuccessRegistry(key)
+func (io *IOHandler) WriteSuccess(ctx context.Context, w http.ResponseWriter, key shared.SuccessKey, data any) {
+	detail, ok := response.SuccessRegistry[key]
 	if !ok {
 		//io.handleMissingKey(ctx, w, key, data)
 		return
@@ -80,7 +79,7 @@ func (io *IOHandler) WriteSuccess(ctx context.Context, w http.ResponseWriter, ke
 	io.respond(ctx, w, detail.HTTPCode, StandardEnvelope{
 		Info: InfoEnvelope{
 			Code:    detail.ResCode,
-			Key:     key,
+			Key:     key.String(),
 			Message: detail.Message,
 		},
 		Data: data,
@@ -88,13 +87,13 @@ func (io *IOHandler) WriteSuccess(ctx context.Context, w http.ResponseWriter, ke
 }
 
 // WriteError ensures that errors are logged before being sent to the client
-func (io *IOHandler) WriteError(ctx context.Context, w http.ResponseWriter, key error, errorFields ValidationErrors) {
-	detail, ok := io.Registry.GetErrorRegistry(key)
+func (io *IOHandler) WriteError(ctx context.Context, w http.ResponseWriter, key shared.ErrorKey, errorFields ValidationErrors) {
+	detail, ok := response.ErrorRegistry[key]
 	if !ok {
 		detail = response.ResponseDetail{ResCode: "INTERNAL_ERROR", HTTPCode: 500, Message: "An unexpected error occurred"}
 	}
 
-	requestID := middleware.GetMetadata(ctx, shared.KeyRequestID)
+	requestID := shared.GetMetadata(ctx, shared.KeyRequestID)
 
 	io.respond(ctx, w, detail.HTTPCode, StandardEnvelope{
 		Info: InfoEnvelope{
@@ -129,12 +128,12 @@ func (io *IOHandler) IdentifierFromPathValue(r *http.Request, key string) (uuid.
 	return id, nil
 }
 
-func (io *IOHandler) HandleServiceError(ctx context.Context, w http.ResponseWriter, errorKey error) {
+func (io *IOHandler) HandleServiceError(ctx context.Context, w http.ResponseWriter, key error) {
 	var envelope StandardEnvelope
 
-	requestID := middleware.GetMetadata(ctx, shared.KeyRequestID)
+	requestID := shared.GetMetadata(ctx, shared.KeyRequestID)
 
-	detail, ok := io.Registry.GetErrorRegistry(errorKey)
+	detail, ok := response.ErrorRegistry[shared.ErrorKey(key.Error())]
 	if !ok {
 		envelope = StandardEnvelope{
 			Info: InfoEnvelope{
@@ -148,7 +147,7 @@ func (io *IOHandler) HandleServiceError(ctx context.Context, w http.ResponseWrit
 		envelope = StandardEnvelope{
 			Info: InfoEnvelope{
 				Code:    detail.ResCode,
-				Key:     errorKey.Error(),
+				Key:     key.Error(),
 				Message: detail.Message,
 			},
 			RequestID: requestID,

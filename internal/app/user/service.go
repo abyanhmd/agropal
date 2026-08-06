@@ -89,13 +89,11 @@ func (s *Service) Delete(ctx context.Context, deleteType shared.DeleteType, user
 		return err
 	}
 	deleteNote := dNote.Note{
-		ID:          noteID,
-		CreatedAt:   nowUTC,
-		AssetType:   shared.AssetUser,
-		AssetID:     targetUser.ID,
-		AuthorID:    requesterID,
-		UpdateField: "user",
-		IsSystemLog: true,
+		ID:        noteID,
+		CreatedAt: nowUTC,
+		AssetType: shared.AssetUser,
+		AssetID:   targetUser.ID,
+		AuthorID:  requesterID,
 	}
 
 	return s.transactor.WithTx(ctx, func(q database.Querier) error {
@@ -110,7 +108,7 @@ func (s *Service) Delete(ctx context.Context, deleteType shared.DeleteType, user
 				return err
 			}
 		}
-		if err = s.noteRepo.CreateManyNote(ctx, q, []dNote.Note{deleteNote}); err != nil {
+		if err = s.noteRepo.CreateNote(ctx, q, deleteNote); err != nil {
 			return err
 		}
 		return nil

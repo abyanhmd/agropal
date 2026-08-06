@@ -1,7 +1,6 @@
 package shared
 
 import (
-	dAuth "agropal/internal/domain/auth"
 	"context"
 	"errors"
 	"net/http"
@@ -36,7 +35,7 @@ func GetMetadata(ctx context.Context, key ContextKey) string {
 	return val
 }
 
-func SaveContextFromRequest(r *http.Request, claims *dAuth.ClaimInfo) context.Context {
+func SaveContextFromRequest(r *http.Request, claims *ClaimInfo) context.Context {
 	ctx := r.Context()
 
 	ctx = WithMetadata(ctx, KeyMethod, r.Method)

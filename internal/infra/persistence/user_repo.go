@@ -82,6 +82,25 @@ func (r *userRepo) FindUserByEmail(ctx context.Context, q database.Querier, emai
 	return userModel.ToDomain(), nil
 }
 
+func (r *userRepo) FindUserByUsername(ctx context.Context, q database.Querier, username string) (dUser.User, error) {
+	query := `
+		SELECT *
+		FROM users
+		WHERE username = $1
+			AND deleted_at IS NULL;`
+
+	var userModel UserModel
+	if err := q.GetContext(ctx, &userModel, query, username); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return dUser.User{}, dUser.ErrNotFound
+		}
+		r.logger.Error(ctx, shared.AssetUser, err.Error())
+		return dUser.User{}, err
+	}
+
+	return userModel.ToDomain(), nil
+}
+
 func (r *userRepo) ListUsers(ctx context.Context, q database.Querier) ([]dUser.User, error) {
 	//TODO implement me
 	panic("implement me")

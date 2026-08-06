@@ -21,12 +21,6 @@ type ResponseRegistry struct {
 	Successes Registry
 }
 
-type ErrorKey string
-
-func (e ErrorKey) Error() string {
-	return string(e)
-}
-
 func NewResponseRegistry(
 	errors Registry,
 	successes Registry,

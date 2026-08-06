@@ -1,8 +1,6 @@
-package auth
+package shared
 
 import (
-	"context"
-
 	"github.com/google/uuid"
 )
 
@@ -17,9 +15,4 @@ type ClaimInfo struct {
 	UserID uuid.UUID `json:"sub"`
 	Email  string    `json:"email"`
 	Role   string    `json:"role"`
-}
-
-type TokenProvider interface {
-	GenerateTokenPair(ctx context.Context, info ClaimInfo) (TokenPair, error)
-	ValidateToken(ctx context.Context, tokenType TokenType, token string) (ClaimInfo, error)
 }

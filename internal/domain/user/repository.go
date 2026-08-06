@@ -13,6 +13,7 @@ type Repository interface {
 	CreateUser(ctx context.Context, q database.Querier, user User) error
 	FindUserByID(ctx context.Context, q database.Querier, userID uuid.UUID) (User, error)
 	FindUserByEmail(ctx context.Context, q database.Querier, email string) (User, error)
+	FindUserByUsername(ctx context.Context, q database.Querier, username string) (User, error)
 	ListUsers(ctx context.Context, q database.Querier) ([]User, error)
 	UpdateUser(ctx context.Context, q database.Querier, user User) error
 	UpdateUserPassword(ctx context.Context, q database.Querier, userID uuid.UUID, password string) error

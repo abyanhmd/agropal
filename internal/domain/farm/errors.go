@@ -1,15 +1,17 @@
 package farm
 
-import "agropal/internal/response"
+import (
+	"agropal/internal/domain/shared"
+)
 
 var (
-	ErrNotFound response.ErrorKey = "FARM.NOT_FOUND"
+	ErrNotFound shared.ErrorKey = "FARM.NOT_FOUND"
 
-	ErrInvalidID     response.ErrorKey = "FARM.INVALID_ID"
-	ErrInvalidName   response.ErrorKey = "FARM.INVALID_NAME"
-	ErrInvalidUserID response.ErrorKey = "FARM.INVALID_USER_ID"
+	ErrInvalidID     shared.ErrorKey = "FARM.INVALID_ID"
+	ErrInvalidName   shared.ErrorKey = "FARM.INVALID_NAME"
+	ErrInvalidUserID shared.ErrorKey = "FARM.INVALID_USER_ID"
 
-	ErrCreateFailed response.ErrorKey = "FARM.CREATE_FAILED"
-	ErrUpdateFailed response.ErrorKey = "FARM.UPDATE_FAILED"
-	ErrDeleteFailed response.ErrorKey = "FARM.DELETE_FAILED"
+	ErrCreateFailed shared.ErrorKey = "FARM.CREATE_FAILED"
+	ErrUpdateFailed shared.ErrorKey = "FARM.UPDATE_FAILED"
+	ErrDeleteFailed shared.ErrorKey = "FARM.DELETE_FAILED"
 )

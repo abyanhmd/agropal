@@ -1,7 +1,6 @@
 package post
 
 import (
-	"agropal/internal/api/middleware"
 	dAuth "agropal/internal/domain/auth"
 	dNote "agropal/internal/domain/note"
 	dPost "agropal/internal/domain/post"
@@ -9,7 +8,6 @@ import (
 	dUser "agropal/internal/domain/user"
 	"agropal/internal/infra/database"
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -73,14 +71,14 @@ func (s *Service) CreatePost(ctx context.Context, cmd PostCommand) error {
 	})
 }
 
-func (s *Service) GetOnePost(ctx context.Context, postID uuid.UUID) (dPost.PostDetail, error) {
+func (s *Service) GetOnePost(ctx context.Context, postID uuid.UUID, filter dPost.FilterQuery) (dPost.PostDetail, error) {
 	var postDetail dPost.PostDetail
 	err := s.transactor.WithTx(ctx, func(q database.Querier) error {
-		post, err := s.postRepo.FindPostByID(ctx, s.transactor.DB(), postID)
+		post, err := s.postRepo.FindPostByID(ctx, q, postID)
 		if err != nil {
 			return err
 		}
-		comments, err := s.postRepo.ListCommentReplies(ctx, q, postID, 10, 0)
+		comments, err := s.postRepo.ListCommentReplies(ctx, q, postID, filter)
 		if err != nil {
 			return err
 		}
@@ -98,11 +96,11 @@ func (s *Service) GetOnePost(ctx context.Context, postID uuid.UUID) (dPost.PostD
 }
 
 func (s *Service) GetManyPosts(ctx context.Context, filter dPost.FilterQuery) ([]dPost.Post, error) {
-	return s.postRepo.ListPosts(ctx, s.transactor.DB(), 10, 0)
+	return s.postRepo.ListPosts(ctx, s.transactor.DB(), filter)
 }
 
 func (s *Service) CreatePostComment(ctx context.Context, cmd PostCommentCommand) error {
-	userID, errParse := middleware.ExtractUserID(ctx)
+	userID, errParse := shared.ExtractUserID(ctx)
 	if errParse != nil {
 		return errParse
 	}
@@ -114,44 +112,13 @@ func (s *Service) CreatePostComment(ctx context.Context, cmd PostCommentCommand)
 	}
 	comment.PostID = commentID
 
-	return s.postRepo.CreatePostComment(ctx, comment)
+	return s.postRepo.AddComment(ctx, s.transactor.DB(), comment)
 }
 
-func (s *Service) GetPostComments(ctx context.Context, postIDStr string) ([]dPost.PostComment, error) {
-	postID, errParse := uuid.Parse(postIDStr)
-	if errParse != nil {
-		return nil, errParse
-	}
-
-	return s.postRepo.GetPostComments(ctx, postID)
-}
-
-func (s *Service) CreatePostEngagement(ctx context.Context, engagementTypeStr, postIDStr string) error {
-	userID, errParse := middleware.ExtractUserID(ctx)
+func (s *Service) CreatePostEngagement(ctx context.Context, postType dPost.PostType, actionType dPost.ActionType, postID uuid.UUID) error {
+	userID, errParse := shared.ExtractUserID(ctx)
 	if errParse != nil {
 		return errParse
-	}
-
-	postID, errParse := uuid.Parse(postIDStr)
-	if errParse != nil {
-		return errParse
-	}
-	var engagementType dPost.ActionType
-	switch engagementTypeStr {
-	case "post_like":
-		engagementType = dPost.ActionLike
-	case "post_dislike":
-		engagementType = dPost.ActionDislike
-	case "post_view":
-		engagementType = dPost.ActionView
-	case "post_comment_like":
-		engagementType = dPost.EngagementCommentLike
-	case "post_comment_dislike":
-		engagementType = dPost.EngagementCommentDislike
-	case "post_comment_view":
-		engagementType = dPost.EngagementCommentSeen
-	default:
-		return errors.New("invalid engagement type")
 	}
 
 	engagementID, errGen := uuid.NewV7()
@@ -159,11 +126,12 @@ func (s *Service) CreatePostEngagement(ctx context.Context, engagementTypeStr, p
 		return errGen
 	}
 
-	return s.postRepo.CreatePostEngagement(ctx, dPost.PostEngagement{
-		ID:     engagementID,
-		PostID: postID,
-		UserID: userID,
-		Type:   engagementType,
+	return s.postRepo.AddEngagement(ctx, s.transactor.DB(), dPost.PostEngagement{
+		ID:        engagementID,
+		AssetID:   postID,
+		AssetType: postType,
+		UserID:    userID,
+		Type:      actionType,
 	})
 }
 

@@ -1,28 +1,30 @@
 package product
 
-import "agropal/internal/response"
+import (
+	"agropal/internal/domain/shared"
+)
 
 var (
-	ErrNotFound response.ErrorKey = "PRODUCT.NOT_FOUND"
+	ErrNotFound shared.ErrorKey = "PRODUCT.NOT_FOUND"
 
-	ErrInvalidID          response.ErrorKey = "PRODUCT.INVALID_ID"
-	ErrInvalidName        response.ErrorKey = "PRODUCT.INVALID_NAME"
-	ErrInvalidDescription response.ErrorKey = "PRODUCT.INVALID_DESCRIPTION"
-	ErrInvalidImage       response.ErrorKey = "PRODUCT.INVALID_IMAGE"
-	ErrInvalidFarmID      response.ErrorKey = "PRODUCT.INVALID_FARM_ID"
+	ErrInvalidID          shared.ErrorKey = "PRODUCT.INVALID_ID"
+	ErrInvalidName        shared.ErrorKey = "PRODUCT.INVALID_NAME"
+	ErrInvalidDescription shared.ErrorKey = "PRODUCT.INVALID_DESCRIPTION"
+	ErrInvalidImage       shared.ErrorKey = "PRODUCT.INVALID_IMAGE"
+	ErrInvalidFarmID      shared.ErrorKey = "PRODUCT.INVALID_FARM_ID"
 
-	ErrCreateFailed response.ErrorKey = "PRODUCT.CREATE_FAILED"
-	ErrUpdateFailed response.ErrorKey = "PRODUCT.UPDATE_FAILED"
-	ErrDeleteFailed response.ErrorKey = "PRODUCT.DELETE_FAILED"
+	ErrCreateFailed shared.ErrorKey = "PRODUCT.CREATE_FAILED"
+	ErrUpdateFailed shared.ErrorKey = "PRODUCT.UPDATE_FAILED"
+	ErrDeleteFailed shared.ErrorKey = "PRODUCT.DELETE_FAILED"
 
-	ErrStockNotFound      response.ErrorKey = "PRODUCT.STOCK_NOT_FOUND"
-	ErrInvalidStockID     response.ErrorKey = "PRODUCT.INVALID_STOCK_ID"
-	ErrInvalidStockType   response.ErrorKey = "PRODUCT.INVALID_STOCK_TYPE"
-	ErrInvalidStockAmount response.ErrorKey = "PRODUCT.INVALID_STOCK_AMOUNT"
+	ErrStockNotFound      shared.ErrorKey = "PRODUCT.STOCK_NOT_FOUND"
+	ErrInvalidStockID     shared.ErrorKey = "PRODUCT.INVALID_STOCK_ID"
+	ErrInvalidStockType   shared.ErrorKey = "PRODUCT.INVALID_STOCK_TYPE"
+	ErrInvalidStockAmount shared.ErrorKey = "PRODUCT.INVALID_STOCK_AMOUNT"
 
-	ErrPriceNotFound       response.ErrorKey = "PRODUCT.PRICE_NOT_FOUND"
-	ErrInvalidPriceID      response.ErrorKey = "PRODUCT.INVALID_PRICE_ID"
-	ErrInvalidPriceAmount  response.ErrorKey = "PRODUCT.INVALID_PRICE_AMOUNT"
-	ErrInsufficientStock   response.ErrorKey = "PRODUCT.INSUFFICIENT_STOCK"
-	ErrInvalidMovementType response.ErrorKey = "PRODUCT.INVALID_MOVEMENT_TYPE"
+	ErrPriceNotFound       shared.ErrorKey = "PRODUCT.PRICE_NOT_FOUND"
+	ErrInvalidPriceID      shared.ErrorKey = "PRODUCT.INVALID_PRICE_ID"
+	ErrInvalidPriceAmount  shared.ErrorKey = "PRODUCT.INVALID_PRICE_AMOUNT"
+	ErrInsufficientStock   shared.ErrorKey = "PRODUCT.INSUFFICIENT_STOCK"
+	ErrInvalidMovementType shared.ErrorKey = "PRODUCT.INVALID_MOVEMENT_TYPE"
 )

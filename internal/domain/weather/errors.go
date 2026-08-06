@@ -1,19 +1,21 @@
 package weather
 
-import "agropal/internal/response"
+import (
+	"agropal/internal/domain/shared"
+)
 
 var (
-	ErrNotFound response.ErrorKey = "WEATHER.NOT_FOUND"
+	ErrNotFound shared.ErrorKey = "WEATHER.NOT_FOUND"
 
-	ErrInvalidID        response.ErrorKey = "WEATHER.INVALID_ID"
-	ErrInvalidFarmID    response.ErrorKey = "WEATHER.INVALID_FARM_ID"
-	ErrInvalidLongitude response.ErrorKey = "WEATHER.INVALID_LONGITUDE"
-	ErrInvalidLatitude  response.ErrorKey = "WEATHER.INVALID_LATITUDE"
+	ErrInvalidID        shared.ErrorKey = "WEATHER.INVALID_ID"
+	ErrInvalidFarmID    shared.ErrorKey = "WEATHER.INVALID_FARM_ID"
+	ErrInvalidLongitude shared.ErrorKey = "WEATHER.INVALID_LONGITUDE"
+	ErrInvalidLatitude  shared.ErrorKey = "WEATHER.INVALID_LATITUDE"
 
-	ErrCreateFailed response.ErrorKey = "WEATHER.CREATE_FAILED"
-	ErrUpdateFailed response.ErrorKey = "WEATHER.UPDATE_FAILED"
-	ErrDeleteFailed response.ErrorKey = "WEATHER.DELETE_FAILED"
+	ErrCreateFailed shared.ErrorKey = "WEATHER.CREATE_FAILED"
+	ErrUpdateFailed shared.ErrorKey = "WEATHER.UPDATE_FAILED"
+	ErrDeleteFailed shared.ErrorKey = "WEATHER.DELETE_FAILED"
 
-	ErrServiceUnavailable response.ErrorKey = "WEATHER.SERVICE_UNAVAILABLE"
-	ErrDataFetchFailed    response.ErrorKey = "WEATHER.DATA_FETCH_FAILED"
+	ErrServiceUnavailable shared.ErrorKey = "WEATHER.SERVICE_UNAVAILABLE"
+	ErrDataFetchFailed    shared.ErrorKey = "WEATHER.DATA_FETCH_FAILED"
 )

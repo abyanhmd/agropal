@@ -2,6 +2,7 @@ package auth
 
 import (
 	dAuth "agropal/internal/domain/auth"
+	"agropal/internal/domain/shared"
 	dUser "agropal/internal/domain/user"
 	"agropal/internal/infra/database"
 	"agropal/internal/infra/identity"
@@ -61,10 +62,26 @@ func (s *Service) Register(ctx context.Context, cmd CreateUserCommand) error {
 	return s.userRepo.CreateUser(ctx, s.transactor.DB(), user)
 }
 
-func (s *Service) Login(ctx context.Context, email, password string) (dAuth.TokenPair, error) {
-	user, err := s.userRepo.FindUserByEmail(ctx, s.transactor.DB(), email)
-	if err != nil {
-		return dAuth.TokenPair{}, err
+func (s *Service) Login(ctx context.Context, cmd LoginUserCommand) (dAuth.TokenPair, error) {
+	var user dUser.User
+	var err error
+
+	if cmd.Email != nil {
+		user, err = s.userRepo.FindUserByEmail(ctx, s.transactor.DB(), *cmd.Email)
+		if err != nil {
+			return dAuth.TokenPair{}, err
+		}
+	}
+	if cmd.Username != nil {
+		user, err = s.userRepo.FindUserByUsername(ctx, s.transactor.DB(), *cmd.Username)
+		if err != nil {
+			return dAuth.TokenPair{}, err
+		}
+	}
+
+	password := cmd.Password
+	if user == (dUser.User{}) {
+		return dAuth.TokenPair{}, dAuth.ErrInvalidCredentials
 	}
 
 	if err = bcrypt.CompareHashAndPassword([]byte(user.Security.Password), []byte(password)); err != nil {
@@ -72,7 +89,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (dAuth.Toke
 	}
 
 	// Generate token pair
-	claims := dAuth.ClaimInfo{
+	claims := shared.ClaimInfo{
 		UserID: user.ID,
 		Email:  user.Account.Email,
 		Role:   string(user.Security.Role),
@@ -94,7 +111,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (dAuth.Toke
 /* ==================== Tokens ====================== */
 
 func (s *Service) Refresh(ctx context.Context, refreshID string) (dAuth.TokenPair, error) {
-	claims, err := s.jwt.ValidateToken(ctx, dAuth.TypeRefresh, refreshID)
+	claims, err := s.jwt.ValidateToken(ctx, shared.TypeRefresh, refreshID)
 	if err != nil {
 		return dAuth.TokenPair{}, err
 	}
@@ -113,7 +130,7 @@ func (s *Service) Refresh(ctx context.Context, refreshID string) (dAuth.TokenPai
 		return dAuth.TokenPair{}, err
 	}
 
-	newClaims := dAuth.ClaimInfo{
+	newClaims := shared.ClaimInfo{
 		UserID: user.ID,
 		Email:  user.Account.Email,
 		Role:   string(user.Security.Role),
@@ -141,7 +158,7 @@ func (s *Service) Refresh(ctx context.Context, refreshID string) (dAuth.TokenPai
 }
 
 func (s *Service) Invalidate(ctx context.Context, refreshID string) error {
-	claims, err := s.jwt.ValidateToken(ctx, dAuth.TypeRefresh, refreshID)
+	claims, err := s.jwt.ValidateToken(ctx, shared.TypeRefresh, refreshID)
 	if err != nil {
 		return err
 	}

@@ -14,7 +14,7 @@ import (
 )
 
 type jwtClaims struct {
-	dAuth.ClaimInfo
+	shared.ClaimInfo
 	jwt.RegisteredClaims
 }
 
@@ -39,7 +39,7 @@ func NewJWTProvider(
 	}
 }
 
-func (j *JWTProvider) GenerateTokenPair(ctx context.Context, claimInfo dAuth.ClaimInfo) (dAuth.TokenPair, error) {
+func (j *JWTProvider) GenerateTokenPair(ctx context.Context, claimInfo shared.ClaimInfo) (dAuth.TokenPair, error) {
 	now := time.Now().UTC()
 
 	accessDuration := time.Duration(30)
@@ -86,14 +86,14 @@ func (j *JWTProvider) GenerateTokenPair(ctx context.Context, claimInfo dAuth.Cla
 	}, nil
 }
 
-func (j *JWTProvider) ValidateToken(ctx context.Context, tokenType dAuth.TokenType, tokenString string) (dAuth.ClaimInfo, error) {
+func (j *JWTProvider) ValidateToken(ctx context.Context, tokenType shared.TokenType, tokenString string) (shared.ClaimInfo, error) {
 	rawToken := tokenString
 
-	if tokenType == dAuth.TypeRefresh {
+	if tokenType == shared.TypeRefresh {
 		decrypted, err := j.enc.DecryptAES(ctx, EncRefreshToken, tokenString)
 		if err != nil {
 			j.logger.Error(ctx, shared.System, err.Error())
-			return dAuth.ClaimInfo{}, dAuth.ErrTokenInvalid
+			return shared.ClaimInfo{}, dAuth.ErrTokenInvalid
 		}
 		rawToken = decrypted
 	}
@@ -106,22 +106,22 @@ func (j *JWTProvider) ValidateToken(ctx context.Context, tokenType dAuth.TokenTy
 	})
 
 	if err != nil || !token.Valid {
-		return dAuth.ClaimInfo{}, fmt.Errorf("token validation failed: %w", err)
+		return shared.ClaimInfo{}, fmt.Errorf("token validation failed: %w", err)
 	}
 
 	claims, ok := token.Claims.(*jwtClaims)
 	if !ok {
-		return dAuth.ClaimInfo{}, fmt.Errorf("invalid claims type")
+		return shared.ClaimInfo{}, fmt.Errorf("invalid claims type")
 	}
 
-	return dAuth.ClaimInfo{
+	return shared.ClaimInfo{
 		UserID: claims.UserID,
 		Email:  claims.Email,
 		Role:   claims.Role,
 	}, nil
 }
 
-func (j *JWTProvider) signToken(info dAuth.ClaimInfo, expiry time.Time) (string, error) {
+func (j *JWTProvider) signToken(info shared.ClaimInfo, expiry time.Time) (string, error) {
 	claims := jwtClaims{
 		ClaimInfo: info,
 		RegisteredClaims: jwt.RegisteredClaims{
