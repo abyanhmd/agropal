@@ -45,7 +45,7 @@ func (h *Handler) CreateProductStock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusCreated, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dProduct.SuccessStockAdded, nil)
 }
 
 func (h *Handler) DeleteProductStock(w http.ResponseWriter, r *http.Request) {
@@ -62,5 +62,5 @@ func (h *Handler) DeleteProductStock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dProduct.SuccessStockDeleted, nil)
 }

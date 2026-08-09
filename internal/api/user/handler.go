@@ -67,7 +67,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dUser.SuccessUpdated, nil)
 }
 
 // ChangePassword verifies the caller's current password before delegating
@@ -104,7 +104,7 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dUser.SuccessUpdated, nil)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +132,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dUser.SuccessDeleted, nil)
 }
 
 func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {

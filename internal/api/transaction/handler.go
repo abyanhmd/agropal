@@ -53,7 +53,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusCreated, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dTransaction.SuccessCreated, nil)
 }
 
 func (h *Handler) GetOne(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +153,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dTransaction.SuccessUpdated, nil)
 }
 
 // Delete removes a set of transactions scoped to a farm/product, given a
@@ -190,7 +190,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dTransaction.SuccessDeleted, nil)
 }
 
 // DeleteMany removes an arbitrary set of transactions the requester has
@@ -215,7 +215,7 @@ func (h *Handler) DeleteMany(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dTransaction.SuccessDeleted, nil)
 }
 
 // DeleteAll removes every transaction across every farm the requester owns.
@@ -227,7 +227,7 @@ func (h *Handler) DeleteAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dTransaction.SuccessDeleted, nil)
 }
 
 func parseUUIDs(ids []string) ([]uuid.UUID, error) {

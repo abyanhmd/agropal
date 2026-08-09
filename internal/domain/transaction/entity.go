@@ -1,6 +1,7 @@
 package transaction
 
 import (
+	"agropal/internal/domain/shared"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,4 +22,10 @@ type TransactionType string
 const (
 	TypeIncome  TransactionType = "INCOME"
 	TypeExpense TransactionType = "EXPENSE"
+)
+
+var (
+	SuccessCreated shared.SuccessKey = "TRANSACTION.CREATE_SUCCESS"
+	SuccessUpdated shared.SuccessKey = "TRANSACTION.UPDATE_SUCCESS"
+	SuccessDeleted shared.SuccessKey = "TRANSACTION.DELETE_SUCCESS"
 )

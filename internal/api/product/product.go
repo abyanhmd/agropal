@@ -40,7 +40,7 @@ func (h *Handler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusCreated, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dProduct.SuccessCreated, nil)
 }
 
 func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +69,7 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dProduct.SuccessUpdated, nil)
 }
 
 func (h *Handler) GetOneProduct(w http.ResponseWriter, r *http.Request) {
@@ -139,5 +139,5 @@ func (h *Handler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dProduct.SuccessDeleted, nil)
 }

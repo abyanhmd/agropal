@@ -68,7 +68,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ioHandler.WriteResponseBody(w, http.StatusOK, tokenPair)
+	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessLogin, tokenPair)
 }
 
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +86,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.ioHandler.WriteResponseBody(w, http.StatusOK, tokenPair)
+	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessRefresh, tokenPair)
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {

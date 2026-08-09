@@ -33,3 +33,9 @@ const (
 	TypeDelete  NoteType = "delete"
 	TypeMerge   NoteType = "merge"
 )
+
+var (
+	SuccessCreated shared.SuccessKey = "NOTE.CREATE_SUCCESS"
+	SuccessUpdated shared.SuccessKey = "NOTE.UPDATE_SUCCESS"
+	SuccessDeleted shared.SuccessKey = "NOTE.DELETE_SUCCESS"
+)

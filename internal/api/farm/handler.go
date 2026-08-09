@@ -43,7 +43,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusCreated, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dFarm.SuccessCreated, nil)
 }
 
 func (h *Handler) GetOne(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +101,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dFarm.SuccessUpdated, nil)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -118,5 +118,5 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dFarm.SuccessDeleted, nil)
 }

@@ -2,6 +2,7 @@ package user
 
 import (
 	dAuth "agropal/internal/domain/auth"
+	"agropal/internal/domain/shared"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,3 +33,8 @@ type UserMetadata struct {
 	DeletedAt   *time.Time
 	LastLoginAt *time.Time
 }
+
+var (
+	SuccessUpdated shared.SuccessKey = "USER.UPDATE_SUCCESS"
+	SuccessDeleted shared.SuccessKey = "USER.DELETE_SUCCESS"
+)

@@ -51,7 +51,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusCreated, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dPost.SuccessCreated, nil)
 }
 
 func (h *Handler) GetOne(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +113,7 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusCreated, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dPost.SuccessCommentCreated, nil)
 }
 
 func (h *Handler) CreatePostEngagement(w http.ResponseWriter, r *http.Request) {

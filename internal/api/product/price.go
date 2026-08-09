@@ -41,7 +41,7 @@ func (h *Handler) CreateProductPrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusCreated, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dProduct.SuccessPriceAdded, nil)
 }
 
 func (h *Handler) DeleteProductPrice(w http.ResponseWriter, r *http.Request) {
@@ -58,5 +58,5 @@ func (h *Handler) DeleteProductPrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusNoContent, nil)
+	h.IoHandler.WriteSuccess(ctx, w, dProduct.SuccessPriceDeleted, nil)
 }

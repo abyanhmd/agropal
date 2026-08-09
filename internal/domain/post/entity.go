@@ -72,3 +72,13 @@ type FilterQuery struct {
 	Pagination *shared.PaginationQuery
 	Sorting    *shared.SortQuery
 }
+
+var (
+	SuccessCreated shared.SuccessKey = "POST.CREATE_SUCCESS"
+	SuccessUpdated shared.SuccessKey = "POST.UPDATE_SUCCESS"
+	SuccessDeleted shared.SuccessKey = "POST.DELETE_SUCCESS"
+
+	SuccessCommentCreated shared.SuccessKey = "POST.COMMENT_CREATE_SUCCESS"
+	SuccessCommentUpdated shared.SuccessKey = "POST.COMMENT_UPDATE_SUCCESS"
+	SuccessCommentDeleted shared.SuccessKey = "POST.COMMENT_DELETE_SUCCESS"
+)
