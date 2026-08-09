@@ -1,6 +1,6 @@
 # Agropal
 
-Agropal is a backend platform for managing farms and farming activity — farms and their weather locations, products with price/stock history, transactions, social posts/comments, and user accounts, all behind a JWT-authenticated REST API.
+Agropal is a backend platform for managing farms and farming activity: farms and their weather locations, products with price/stock history, transactions, social posts/comments, and user accounts, all behind a JWT-authenticated REST API.
 
 ## Tech Stack
 
@@ -34,7 +34,7 @@ backend/
 ├── cmd/
 │   ├── api/                  # HTTP server entry point (main.go)
 │   ├── email/                # (scaffolded, empty)
-│   └── migration/            # (scaffolded, empty — migrations currently run manually)
+│   └── migration/            # (scaffolded, empty; migrations currently run manually)
 ├── config/                   # config.yaml + env-backed Config loader
 ├── internal/
 │   ├── api/                  # HTTP layer, one package per domain
@@ -77,6 +77,10 @@ All routes are mounted under `/api/v1`. Everything except `/auth/*` requires `Au
 | Post | `POST/GET /post`, `GET /post/{post_id}`, `POST /post/{post_id}/comment`, `POST /post/{post_id}/engagement`, `POST /comment/{comment_id}/engagement` |
 | User | `GET/PATCH/DELETE /user/{user_id}` (or `me`), `PATCH /user/{user_id}/password`, `GET /users` |
 
+## Response Conventions
+
+Mutating endpoints (`POST` create, `PATCH`, `DELETE`) respond with a success envelope (`{info: {code, key, message}, data, request_id}`) instead of a bare status with no body. `key`/`message` are looked up in `response.SuccessRegistry` (`internal/response/registry_success.go`) by the domain's `SuccessKey` (e.g. `dFarm.SuccessCreated` → `"FARM.CREATE_SUCCESS"`), defined alongside each domain's error keys in `internal/domain/<domain>/entity.go`. `GET` endpoints and `POST /auth/login`/`/auth/refresh` return the raw DTO instead, and errors use the equivalent `ErrorRegistry`-backed envelope. See `docs/openapi.yaml` and `docs/README.md` for the full endpoint-by-endpoint mapping.
+
 ## Getting Started
 
 ### Prerequisites
@@ -110,7 +114,7 @@ Server and path settings (host, port, migration/log paths) live in `backend/conf
 
 ### Database
 
-Apply the SQL files under `internal/migration/` (numbered `up`/`down` pairs) against your Postgres instance in order — there's no migration runner wired up yet (`cmd/migration` is a placeholder).
+Apply the SQL files under `internal/migration/` (numbered `up`/`down` pairs) against your Postgres instance in order; there's no migration runner wired up yet (`cmd/migration` is a placeholder).
 
 ### Running
 
@@ -133,18 +137,18 @@ There is no automated test suite yet.
 
 ## Domains
 
-- **Auth** — registration, login, refresh-token rotation (AES-GCM encrypted at rest), logout, password reset (token issued via the refresh-token store)
-- **User** — profile (name/avatar), password change, soft/hard delete, listing users by related asset
-- **Farm** — a user's farms
-- **Weather** — weather-tracked locations (lat/long) attached to a farm
-- **Product** — a farm's products, with append-only price and stock history
-- **Transaction** — income/expense records against a product
-- **Post** — posts with comments and like/dislike/view engagement, backed by an audit trail in `domain/note`
+- **Auth**: registration, login, refresh-token rotation (AES-GCM encrypted at rest), logout, password reset (token issued via the refresh-token store)
+- **User**: profile (name/avatar), password change, soft/hard delete, listing users by related asset
+- **Farm**: a user's farms
+- **Weather**: weather-tracked locations (lat/long) attached to a farm
+- **Product**: a farm's products, with append-only price and stock history
+- **Transaction**: income/expense records against a product
+- **Post**: posts with comments and like/dislike/view engagement, backed by an audit trail in `domain/note`
 
 ## Known Limitations
 
-- `response.ErrorRegistry` / `SuccessRegistry` are currently empty, so error responses fall back to a generic message instead of a domain-specific code/HTTP status.
-- Struct `validate` tags exist on several commands but no validation library is wired in yet — they're currently documentation only.
+- Not every mutation has a dedicated success key yet; post/comment engagement endpoints (`POST /post/{post_id}/engagement`, `POST /comment/{comment_id}/engagement`) still return a bare `201` with no body.
+- Struct `validate` tags exist on several commands but no validation library is wired in yet; they're currently documentation only.
 - `app/product`'s `UpdateProduct` records an audit note for changed fields but doesn't yet persist the new values.
 - `cmd/email`, `cmd/migration`, and `boilerplate/*` are scaffolded but empty.
 - No automated tests.

@@ -1,0 +1,1396 @@
+openapi: 3.0.3
+info:
+  title: Agropal API
+  description: |
+    OpenAPI 3.0 specification for the Agropal backend.
+
+    Notes on response conventions (derived from the implementation):
+    - Endpoints that return a resource (`GET`, and `POST /auth/login`/`/auth/refresh`) return the **raw DTO** as JSON (no envelope).
+    - Mutating endpoints (`POST` create, `PATCH`, `DELETE`) return a `SuccessEnvelope` carrying a machine-readable `key` and human-readable `message` from the response registry, instead of a bare status with no body.
+    - Error responses are wrapped in a standard envelope (`ErrorEnvelope`).
+    - All endpoints except `/auth/*` require a Bearer JWT access token.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+  - name: Farm
+  - name: Weather
+  - name: Product
+  - name: Transaction
+  - name: User
+  - name: Post
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email/username and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+      responses:
+        '200':
+          description: Login successful, returns access/refresh token pair in `data`. A `rid` httpOnly cookie carrying the refresh token is also set.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenPair'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh an access token using the `rid` refresh cookie
+      security: []
+      parameters:
+        - name: rid
+          in: cookie
+          required: true
+          description: httpOnly refresh token cookie set on login
+          schema:
+            type: string
+      responses:
+        '200':
+          description: New access/refresh token pair, returned in `data`
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenPair'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout and revoke the refresh token
+      security: []
+      parameters:
+        - name: rid
+          in: cookie
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /farm:
+    post:
+      tags: [Farm]
+      summary: Create a farm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FarmRequest'
+      responses:
+        '201':
+          description: Farm created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      tags: [Farm]
+      summary: List farms
+      responses:
+        '200':
+          description: List of farms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FarmResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /farm/{farm_id}:
+    parameters:
+      - $ref: '#/components/parameters/FarmId'
+    get:
+      tags: [Farm]
+      summary: Get a farm by ID
+      responses:
+        '200':
+          description: Farm
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Farm]
+      summary: Update a farm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FarmRequest'
+      responses:
+        '200':
+          description: Farm updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Farm]
+      summary: Delete a farm
+      responses:
+        '200':
+          description: Farm deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /farm/{farm_id}/weather:
+    parameters:
+      - $ref: '#/components/parameters/FarmId'
+    post:
+      tags: [Weather]
+      summary: Create weather location for a farm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WeatherRequest'
+      responses:
+        '201':
+          description: Weather record created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      tags: [Weather]
+      summary: List weather records for a farm
+      responses:
+        '200':
+          description: List of weather records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WeatherResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /farm/{farm_id}/weather/{weather_id}:
+    parameters:
+      - $ref: '#/components/parameters/FarmId'
+      - name: weather_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      tags: [Weather]
+      summary: Update a weather record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WeatherRequest'
+      responses:
+        '200':
+          description: Weather record updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Weather]
+      summary: Delete a weather record
+      responses:
+        '200':
+          description: Weather record deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /farm/{farm_id}/product:
+    parameters:
+      - $ref: '#/components/parameters/FarmId'
+    post:
+      tags: [Product]
+      summary: Create a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      tags: [Product]
+      summary: List products (with stocks and prices) for a farm
+      responses:
+        '200':
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductDetailResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /farm/{farm_id}/product/{product_id}:
+    parameters:
+      - $ref: '#/components/parameters/FarmId'
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      tags: [Product]
+      summary: Get a product (with stocks and prices)
+      responses:
+        '200':
+          description: Product detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetailResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Product]
+      summary: Update a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '200':
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Product]
+      summary: Delete a product
+      responses:
+        '200':
+          description: Product deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /farm/{farm_id}/product/{product_id}/price:
+    parameters:
+      - $ref: '#/components/parameters/FarmId'
+      - $ref: '#/components/parameters/ProductId'
+    post:
+      tags: [Product]
+      summary: Add a price entry to a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductPriceRequest'
+      responses:
+        '201':
+          description: Price entry created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /farm/{farm_id}/product/{product_id}/price/{price_id}:
+    parameters:
+      - $ref: '#/components/parameters/FarmId'
+      - $ref: '#/components/parameters/ProductId'
+      - name: price_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [Product]
+      summary: Delete a product price entry
+      responses:
+        '200':
+          description: Price entry deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /farm/{farm_id}/product/{product_id}/stock:
+    parameters:
+      - $ref: '#/components/parameters/FarmId'
+      - $ref: '#/components/parameters/ProductId'
+    post:
+      tags: [Product]
+      summary: Add a stock movement entry to a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductStockRequest'
+      responses:
+        '201':
+          description: Stock entry created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /farm/{farm_id}/product/{product_id}/stock/{stock_id}:
+    parameters:
+      - $ref: '#/components/parameters/FarmId'
+      - $ref: '#/components/parameters/ProductId'
+      - name: stock_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [Product]
+      summary: Delete a product stock entry
+      responses:
+        '200':
+          description: Stock entry deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /farm/{farm_id}/transaction:
+    parameters:
+      - $ref: '#/components/parameters/FarmId'
+    get:
+      tags: [Transaction]
+      summary: List all transactions for a farm (across all products)
+      responses:
+        '200':
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransactionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /farm/{farm_id}/product/{product_id}/transaction:
+    parameters:
+      - $ref: '#/components/parameters/FarmId'
+      - $ref: '#/components/parameters/ProductId'
+    post:
+      tags: [Transaction]
+      summary: Create one or more transactions for a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTransactionsRequest'
+      responses:
+        '201':
+          description: Transaction(s) created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      tags: [Transaction]
+      summary: List transactions for a product
+      responses:
+        '200':
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransactionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [Transaction]
+      summary: Delete transactions for a product by ID list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteTransactionsRequest'
+      responses:
+        '200':
+          description: Transactions deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /farm/{farm_id}/product/{product_id}/transaction/{transaction_id}:
+    parameters:
+      - $ref: '#/components/parameters/FarmId'
+      - $ref: '#/components/parameters/ProductId'
+      - name: transaction_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Transaction]
+      summary: Get a single transaction
+      responses:
+        '200':
+          description: Transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Transaction]
+      summary: Update a transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionRequest'
+      responses:
+        '200':
+          description: Transaction updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /transaction:
+    delete:
+      tags: [Transaction]
+      summary: Delete transactions by ID list (across farms/products)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteTransactionsRequest'
+      responses:
+        '200':
+          description: Transactions deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /transaction/all:
+    delete:
+      tags: [Transaction]
+      summary: Delete all transactions owned by the requesting user
+      responses:
+        '200':
+          description: All transactions deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /user/{user_id}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [User]
+      summary: Get a user by ID (use `me` for the current user)
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [User]
+      summary: Update a user's name/avatar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [User]
+      summary: Delete a user (soft by default)
+      parameters:
+        - name: permanent
+          in: query
+          required: false
+          description: '"true" for a hard delete, "false" or omitted for a soft delete'
+          schema:
+            type: string
+            enum: ["true", "false"]
+      responses:
+        '200':
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /user/{user_id}/password:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    patch:
+      tags: [User]
+      summary: Change a user's password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users:
+    get:
+      tags: [User]
+      summary: List users associated with an asset
+      parameters:
+        - name: asset_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [User, Farm, Product, Post, Comment]
+        - name: asset_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /post:
+    post:
+      tags: [Post]
+      summary: Create a post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+      responses:
+        '201':
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      tags: [Post]
+      summary: List posts
+      parameters:
+        - name: slug
+          in: query
+          schema:
+            type: string
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+        - name: sort_column
+          in: query
+          schema:
+            type: string
+        - name: sort_dir
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+      responses:
+        '200':
+          description: List of posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /post/{post_id}:
+    parameters:
+      - $ref: '#/components/parameters/PostId'
+    get:
+      tags: [Post]
+      summary: Get a post with its comments
+      responses:
+        '200':
+          description: Post detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostDetailResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /post/{post_id}/comment:
+    parameters:
+      - $ref: '#/components/parameters/PostId'
+    post:
+      tags: [Post]
+      summary: Comment on a post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommentRequest'
+      responses:
+        '201':
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /post/{post_id}/engagement:
+    parameters:
+      - $ref: '#/components/parameters/PostId'
+    post:
+      tags: [Post]
+      summary: Like/dislike/view a post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostEngagementRequest'
+      responses:
+        '201':
+          description: Engagement recorded
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /comment/{comment_id}/engagement:
+    parameters:
+      - name: comment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [Post]
+      summary: Like/dislike/view a comment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostEngagementRequest'
+      responses:
+        '201':
+          description: Engagement recorded
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    FarmId:
+      name: farm_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ProductId:
+      name: product_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      name: user_id
+      in: path
+      required: true
+      description: A UUID, or the literal string "me" for the authenticated user
+      schema:
+        type: string
+    PostId:
+      name: post_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      properties:
+        info:
+          type: object
+          properties:
+            code:
+              type: integer
+            key:
+              type: string
+            message:
+              type: string
+        errors:
+          type: array
+          items:
+            type: string
+          nullable: true
+        request_id:
+          type: string
+
+    SuccessEnvelope:
+      type: object
+      properties:
+        info:
+          type: object
+          properties:
+            code:
+              type: integer
+            key:
+              type: string
+            message:
+              type: string
+        data:
+          nullable: true
+        request_id:
+          type: string
+
+    # ---- Auth ----
+    UserRequest:
+      type: object
+      description: Used for both register (name/email/username/password required) and login (email or username + password).
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        avatar:
+          type: string
+        password:
+          type: string
+          format: password
+
+    TokenPair:
+      type: object
+      description: Field names follow the Go struct's exact capitalization (no json tags defined on this type).
+      properties:
+        AccessTokenStr:
+          type: string
+        RefreshToken:
+          type: object
+          properties:
+            ID:
+              type: string
+              format: uuid
+            Token:
+              type: string
+            UserAgent:
+              type: string
+            IPAddress:
+              type: string
+            ExpiresAt:
+              type: integer
+              format: int64
+            UserID:
+              type: string
+              format: uuid
+
+    # ---- Farm ----
+    FarmRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    FarmResponse:
+      type: object
+      properties:
+        farm_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+
+    # ---- Weather ----
+    WeatherRequest:
+      type: object
+      properties:
+        longitude:
+          type: number
+          format: double
+        latitude:
+          type: number
+          format: double
+
+    WeatherResponse:
+      type: object
+      properties:
+        weather_id:
+          type: string
+          format: uuid
+        longitude:
+          type: number
+          format: double
+        latitude:
+          type: number
+          format: double
+
+    # ---- Product ----
+    ProductRequest:
+      type: object
+      description: On create, name/description/image are all required. On update, any subset may be provided.
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        image:
+          type: string
+
+    ProductResponse:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        farm_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        image:
+          type: string
+
+    ProductPriceRequest:
+      type: object
+      required: [date_added, price]
+      properties:
+        date_added:
+          type: string
+          format: date-time
+        price:
+          type: number
+          format: double
+
+    ProductPriceResponse:
+      type: object
+      properties:
+        price_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        date_added:
+          type: string
+          format: date-time
+        price:
+          type: number
+          format: double
+
+    ProductStockRequest:
+      type: object
+      required: [date_added, type, stock]
+      properties:
+        date_added:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [IN, OUT]
+        stock:
+          type: number
+          format: double
+
+    ProductStockResponse:
+      type: object
+      properties:
+        stock_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        date_added:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [IN, OUT]
+        stock:
+          type: number
+          format: double
+
+    ProductDetailResponse:
+      type: object
+      properties:
+        product:
+          $ref: '#/components/schemas/ProductResponse'
+        stocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductStockResponse'
+        prices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductPriceResponse'
+
+    # ---- Transaction ----
+    TransactionRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [INCOME, EXPENSE]
+        amount:
+          type: number
+          format: double
+        description:
+          type: string
+
+    CreateTransactionsRequest:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionRequest'
+
+    DeleteTransactionsRequest:
+      type: object
+      properties:
+        transaction_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    TransactionResponse:
+      type: object
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [INCOME, EXPENSE]
+        amount:
+          type: number
+          format: double
+        description:
+          type: string
+
+    # ---- User ----
+    UserUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        avatar:
+          type: string
+
+    ChangePasswordRequest:
+      type: object
+      required: [old_password, new_password]
+      properties:
+        old_password:
+          type: string
+          format: password
+        new_password:
+          type: string
+          format: password
+
+    UserResponse:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        avatar:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, USER, GUEST]
+
+    # ---- Post ----
+    PostRequest:
+      type: object
+      required: [title, content]
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+
+    PostCommentRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+
+    PostEngagementRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [LIKE, DISLIKE, VIEW]
+
+    PostResponse:
+      type: object
+      properties:
+        post_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        content:
+          type: string
+        slug:
+          type: string
+        like_count:
+          type: integer
+        dislike_count:
+          type: integer
+        view_count:
+          type: integer
+        comment_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    PostCommentResponse:
+      type: object
+      properties:
+        comment_id:
+          type: string
+          format: uuid
+        post_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        content:
+          type: string
+        reply_count:
+          type: integer
+        like_count:
+          type: integer
+        dislike_count:
+          type: integer
+        view_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    PostDetailResponse:
+      type: object
+      properties:
+        post:
+          $ref: '#/components/schemas/PostResponse'
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostCommentResponse'
