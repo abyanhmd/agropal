@@ -22,9 +22,11 @@ import (
 	"agropal/internal/infra/database"
 	"agropal/internal/infra/identity"
 	"agropal/internal/infra/persistence"
+	"agropal/internal/infra/queue"
 	"agropal/pkg"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/redis/go-redis/v9"
 )
 
 type Toolkit struct {
@@ -32,6 +34,8 @@ type Toolkit struct {
 	Config     *config.Config
 	Encryption *crypto.Encryption
 	DB         *sqlx.DB
+	Redis      *redis.Client
+	Queue      *queue.RabbitMQ
 }
 
 func NewToolkit(
@@ -39,17 +43,22 @@ func NewToolkit(
 	cfg *config.Config,
 	enc *crypto.Encryption,
 	db *sqlx.DB,
+	redis *redis.Client,
+	mq *queue.RabbitMQ,
 ) *Toolkit {
 	return &Toolkit{
 		Logger:     logger,
 		Config:     cfg,
 		Encryption: enc,
 		DB:         db,
+		Redis:      redis,
+		Queue:      mq,
 	}
 }
 
 type Container struct {
-	JWT dAuth.TokenProvider
+	JWT   dAuth.TokenProvider
+	Queue *queue.RabbitMQ
 
 	Auth        *AuthModule
 	User        *UserModule
@@ -109,7 +118,7 @@ func NewContainer(
 
 	/* Service */
 
-	authService := aAuth.NewService(transactor, generator, jwt, authRepo, userRepo)
+	authService := aAuth.NewService(t.Logger, transactor, generator, jwt, t.Redis, t.Queue, authRepo, userRepo)
 	userService := aUser.NewService(transactor, userRepo, noteRepo)
 	farmService := aFarm.NewService(transactor, userRepo, farmRepo)
 	weatherService := aWeather.NewService(transactor, userRepo, farmRepo, weatherRepo)
@@ -119,6 +128,7 @@ func NewContainer(
 
 	return &Container{
 		JWT:         jwt,
+		Queue:       t.Queue,
 		Auth:        &AuthModule{Service: authService},
 		User:        &UserModule{Service: userService},
 		Farm:        &FarmModule{Service: farmService},

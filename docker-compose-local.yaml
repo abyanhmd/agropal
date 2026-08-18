@@ -1,0 +1,182 @@
+services:
+  traefik:
+    image: traefik:v3.7.10
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - "--api=true"
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--log.level=DEBUG"
+      - "--accesslog=true"
+    networks:
+      - web-proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.routers.traefik.service=api@internal"
+
+  go-api:
+    container_name: go-api
+    build:
+      context: .
+      dockerfile: cmd/api/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Override the host-facing values from .env with the in-network
+      # service names/addresses so the containerized app can actually
+      # reach its dependencies (`.env`'s `localhost` values are only
+      # correct when running via `go run` on the host).
+      POSTGRES_HOST: postgres
+      REDIS_ADDRESS: redis:6379
+      RABBITMQ_ADDRESS: rabbitmq:5672
+    expose:
+      - "8080"
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs:rw
+    networks:
+      - internal
+      - web-proxy
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.go-api.rule=Host(`api.localhost`)"
+      - "traefik.http.routers.go-api.entrypoints=web"
+      - "traefik.http.routers.go-api.service=go-api"
+      - "traefik.http.services.go-api.loadbalancer.server.port=8080"
+      - "traefik.docker.network=web-proxy"
+
+  go-migrate:
+    container_name: go-migrate
+    build:
+      context: .
+      dockerfile: cmd/migration/Dockerfile
+    restart: "no"
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs:rw
+      - ./internal/migration:/app/internal/migration:ro
+    networks:
+      - internal
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  go-worker-email:
+    container_name: go-worker-email
+    build:
+      context: .
+      dockerfile: cmd/email/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      RABBITMQ_ADDRESS: rabbitmq:5672
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs:rw
+    networks:
+      - web-proxy
+      - internal
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+  postgres:
+    container_name: postgres
+    image: postgres:18-alpine
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/postgres:/docker-entrypoint-initdb.d:ro
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    container_name: redis
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - ./data/redis:/data:rw
+      - ./scripts/redis:/docker-entrypoint-initdb.d:ro
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3.12
+    restart: unless-stopped
+    environment:
+      # The image's default guest/guest account is restricted to
+      # loopback connections only, which container-to-container AMQP
+      # traffic is not. Setting these explicitly (even to the same
+      # guest/guest values) creates a real remote-capable user matching
+      # what the app's RABBITMQ_USERNAME/PASSWORD expect. Compose loads
+      # ./.env for this ${...} interpolation on its own, independent of
+      # any service's env_file: - no need for that here, which would
+      # otherwise also leak the app's unrelated JWT/GCM/SMTP secrets
+      # into this container's environment.
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./data/rabbitmq:/var/lib/rabbitmq:rw
+      - ./scripts/rabbitmq:/docker-entrypoint-initdb.d:ro
+    networks:
+      - internal
+      - web-proxy
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmqctl status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rabbitmq.rule=Host(`rabbitmq.localhost`)"
+      - "traefik.http.services.rmq.loadbalancer.server.port=15672"
+      - "traefik.docker.network=web-proxy"
+
+networks:
+  web-proxy:
+    name: web-proxy
+  internal:
+    name: internal
+    internal: true
+
+volumes:
+  pgdata:
+  cache:
+    driver: local
+  rabbitmq_data:

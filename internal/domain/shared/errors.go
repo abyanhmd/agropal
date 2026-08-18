@@ -19,4 +19,5 @@ var (
 	ErrGatewayTimeout     ErrorKey = "COMMON.GATEWAY_TIMEOUT"
 	ErrInvalidInput       ErrorKey = "COMMON.INVALID_INPUT"
 	ErrDatabaseError      ErrorKey = "COMMON.DATABASE_ERROR"
+	ErrValidation         ErrorKey = "COMMON.VALIDATION_FAILED"
 )

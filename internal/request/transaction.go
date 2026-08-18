@@ -7,10 +7,10 @@ import (
 )
 
 type TransactionRequest struct {
-	Date        time.Time `json:"date"`
-	Type        string    `json:"type"`
-	Amount      float64   `json:"amount"`
-	Description string    `json:"description"`
+	Date        time.Time `json:"date" validate:"required"`
+	Type        string    `json:"type" validate:"required,oneof=INCOME EXPENSE"`
+	Amount      float64   `json:"amount" validate:"required,gt=0"`
+	Description string    `json:"description" validate:"max=255"`
 }
 
 func (r *TransactionRequest) ToCommand() aTransaction.TransactionCommand {
@@ -23,7 +23,7 @@ func (r *TransactionRequest) ToCommand() aTransaction.TransactionCommand {
 }
 
 type CreateTransactionsRequest struct {
-	Transactions []TransactionRequest `json:"transactions"`
+	Transactions []TransactionRequest `json:"transactions" validate:"required,min=1,dive"`
 }
 
 func (r *CreateTransactionsRequest) ToCommands() []aTransaction.TransactionCommand {
@@ -35,5 +35,5 @@ func (r *CreateTransactionsRequest) ToCommands() []aTransaction.TransactionComma
 }
 
 type DeleteTransactionsRequest struct {
-	TransactionIDs []string `json:"transaction_ids"`
+	TransactionIDs []string `json:"transaction_ids" validate:"required,min=1,dive,uuid"`
 }

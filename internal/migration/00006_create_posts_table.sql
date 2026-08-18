@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE IF NOT EXISTS posts (
 	post_id UUID PRIMARY KEY,
 	user_id UUID NOT NULL REFERENCES users (user_id),
@@ -26,3 +27,10 @@ CREATE TABLE IF NOT EXISTS post_engagements(
 	type VARCHAR(255) NOT NULL,
 	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS post_engagements;
+
+DROP TABLE IF EXISTS post_comments;
+
+DROP TABLE IF EXISTS posts;

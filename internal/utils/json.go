@@ -12,17 +12,20 @@ import (
 )
 
 type IOHandler struct {
-	Logger   *pkg.Logger
-	Registry *response.ResponseRegistry
+	Logger    *pkg.Logger
+	Registry  *response.ResponseRegistry
+	Validator *Validator
 }
 
 func NewIOHandler(
 	logger *pkg.Logger,
 	registry *response.ResponseRegistry,
+	validator *Validator,
 ) *IOHandler {
 	return &IOHandler{
-		Logger:   logger,
-		Registry: registry,
+		Logger:    logger,
+		Registry:  registry,
+		Validator: validator,
 	}
 }
 
@@ -112,6 +115,17 @@ func (io *IOHandler) respond(ctx context.Context, w http.ResponseWriter, status 
 	if err := json.NewEncoder(w).Encode(envelope); err != nil {
 		io.Logger.Error(ctx, shared.System, err.Error())
 	}
+}
+
+// ValidateStruct runs struct-tag validation on s. If validation fails it
+// writes a 400 response with per-field messages and returns false; callers
+// should stop handling the request in that case.
+func (io *IOHandler) ValidateStruct(ctx context.Context, w http.ResponseWriter, s any) bool {
+	if errs := io.Validator.ValidateStruct(s); errs != nil {
+		io.WriteError(ctx, w, shared.ErrValidation, errs)
+		return false
+	}
+	return true
 }
 
 func (io *IOHandler) IdentifierFromPathValue(r *http.Request, key string) (uuid.UUID, error) {

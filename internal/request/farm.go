@@ -5,7 +5,7 @@ import (
 )
 
 type FarmRequest struct {
-	Name string `json:"name"`
+	Name string `json:"name" validate:"required"`
 }
 
 func (r *FarmRequest) ToCommand() aFarm.FarmCommand {

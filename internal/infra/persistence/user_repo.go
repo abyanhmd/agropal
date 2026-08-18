@@ -142,6 +142,20 @@ func (r *userRepo) UpdateUserPassword(ctx context.Context, q database.Querier, u
 	return nil
 }
 
+func (r *userRepo) VerifyUserEmail(ctx context.Context, q database.Querier, userID uuid.UUID, verifiedAt time.Time) error {
+	query := `UPDATE users SET email_verified_at = $1 WHERE user_id = $2;`
+
+	if _, err := q.ExecContext(ctx, query, verifiedAt, userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return dUser.ErrNotFound
+		}
+		r.logger.Error(ctx, shared.AssetUser, err.Error())
+		return err
+	}
+
+	return nil
+}
+
 func (r *userRepo) SoftDeleteUser(ctx context.Context, q database.Querier, userID uuid.UUID, deletedAt time.Time) error {
 	query := `UPDATE users SET deleted_at = $1 WHERE user_id = $2;`
 

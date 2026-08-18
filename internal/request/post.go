@@ -8,8 +8,8 @@ import (
 )
 
 type PostRequest struct {
-	Title   string `json:"title"`
-	Content string `json:"content"`
+	Title   string `json:"title" validate:"required,max=255"`
+	Content string `json:"content" validate:"required"`
 }
 
 func (r *PostRequest) ToCommand(userID uuid.UUID) aPost.PostCommand {
@@ -21,7 +21,7 @@ func (r *PostRequest) ToCommand(userID uuid.UUID) aPost.PostCommand {
 }
 
 type PostCommentRequest struct {
-	Content string `json:"content"`
+	Content string `json:"content" validate:"required"`
 }
 
 func (r *PostCommentRequest) ToCommand(postID uuid.UUID) aPost.PostCommentCommand {

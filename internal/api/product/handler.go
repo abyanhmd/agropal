@@ -6,8 +6,8 @@ import (
 )
 
 type Handler struct {
-	IoHandler      *utils.IOHandler
-	ProductService *aProduct.Service
+	ioHandler      *utils.IOHandler
+	productService *aProduct.Service
 }
 
 func NewHandler(
@@ -15,7 +15,7 @@ func NewHandler(
 	productService *aProduct.Service,
 ) Handler {
 	return Handler{
-		IoHandler:      tool,
-		ProductService: productService,
+		ioHandler:      tool,
+		productService: productService,
 	}
 }

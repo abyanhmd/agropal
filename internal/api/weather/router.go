@@ -1,6 +1,7 @@
 package weather
 
 import (
+	"agropal/config"
 	"agropal/internal/api/middleware"
 	"net/http"
 )
@@ -12,6 +13,7 @@ type Router struct {
 func NewRouter(
 	mux *http.ServeMux,
 	stack middleware.HandlerMiddleware,
+	mw *middleware.Middleware,
 	handler Handler,
 ) *Router {
 
@@ -20,25 +22,25 @@ func NewRouter(
 			Path:        "/farm/{farm_id}/weather",
 			Method:      http.MethodPost,
 			Handler:     handler.Create,
-			Middlewares: []middleware.HandlerMiddleware{},
+			Middlewares: []middleware.HandlerMiddleware{mw.RequirePermission(config.PermCreateWeatherLocation)},
 		},
 		{
 			Path:        "/farm/{farm_id}/weather",
 			Method:      http.MethodGet,
 			Handler:     handler.GetByFarmID,
-			Middlewares: []middleware.HandlerMiddleware{},
+			Middlewares: []middleware.HandlerMiddleware{mw.RequirePermission(config.PermGetWeatherLocationByFarmID)},
 		},
 		{
 			Path:        "/farm/{farm_id}/weather/{weather_id}",
 			Method:      http.MethodPatch,
 			Handler:     handler.Update,
-			Middlewares: []middleware.HandlerMiddleware{},
+			Middlewares: []middleware.HandlerMiddleware{mw.RequirePermission(config.PermUpdateWeatherLocation)},
 		},
 		{
 			Path:        "/farm/{farm_id}/weather/{weather_id}",
 			Method:      http.MethodDelete,
 			Handler:     handler.Delete,
-			Middlewares: []middleware.HandlerMiddleware{},
+			Middlewares: []middleware.HandlerMiddleware{mw.RequirePermission(config.PermDeleteWeatherLocation)},
 		},
 	}
 

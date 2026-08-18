@@ -1,7 +1,7 @@
 package weather
 
 import (
-	dAuth "agropal/internal/domain/auth"
+	"agropal/config"
 	dFarm "agropal/internal/domain/farm"
 	"agropal/internal/domain/shared"
 	dUser "agropal/internal/domain/user"
@@ -66,7 +66,7 @@ func (s *Service) Update(ctx context.Context, farmID, weatherID uuid.UUID, cmd W
 			return err
 		}
 		requesterRole := shared.GetMetadata(ctx, shared.KeyRole)
-		if exists.FarmID != farmID && requesterRole != string(dAuth.RoleAdmin) {
+		if exists.FarmID != farmID && requesterRole != string(config.RoleAdmin) {
 			return shared.ErrForbidden
 		}
 		weather := cmd.ToDomain(weatherID, farmID)
@@ -88,7 +88,7 @@ func (s *Service) Delete(ctx context.Context, farmID, weatherID uuid.UUID) error
 			return err
 		}
 		requesterRole := shared.GetMetadata(ctx, shared.KeyRole)
-		if exists.FarmID != farmID && requesterRole != string(dAuth.RoleAdmin) {
+		if exists.FarmID != farmID && requesterRole != string(config.RoleAdmin) {
 			return shared.ErrForbidden
 		}
 		if err := s.weatherRepo.DeleteWeatherLocation(ctx, q, weatherID); err != nil {
@@ -116,7 +116,7 @@ func (s *Service) verifyFarm(ctx context.Context, farmID uuid.UUID) error {
 			return err
 		}
 		requesterRole := shared.GetMetadata(ctx, shared.KeyRole)
-		if farm.UserID != user.ID && requesterRole != string(dAuth.RoleAdmin) {
+		if farm.UserID != user.ID && requesterRole != string(config.RoleAdmin) {
 			return shared.ErrForbidden
 		}
 		return nil

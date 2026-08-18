@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE IF NOT EXISTS users (
     user_id UUID PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -9,7 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMPTZ,
-    last_login_at TIMESTAMPTZ
+    last_login_at TIMESTAMPTZ,
+    email_verified_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
@@ -20,3 +22,8 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     user_agent TEXT,
     ip_address TEXT
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS refresh_tokens;
+
+DROP TABLE IF EXISTS users;

@@ -11,8 +11,8 @@ import (
 )
 
 type Handler struct {
-	IoHandler      *utils.IOHandler
-	WeatherService *aWeather.Service
+	ioHandler      *utils.IOHandler
+	weatherService *aWeather.Service
 }
 
 func NewHandler(
@@ -20,46 +20,49 @@ func NewHandler(
 	weatherService *aWeather.Service,
 ) Handler {
 	return Handler{
-		IoHandler:      tool,
-		WeatherService: weatherService,
+		ioHandler:      tool,
+		weatherService: weatherService,
 	}
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.ioHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dWeather.ErrInvalidFarmID, nil)
+		h.ioHandler.WriteError(ctx, w, dWeather.ErrInvalidFarmID, nil)
 		return
 	}
 
 	var req request.WeatherRequest
-	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+	if err = h.ioHandler.ReadRequestBody(r, &req); err != nil {
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+		return
+	}
+	if !h.ioHandler.ValidateStruct(ctx, w, req) {
 		return
 	}
 
-	if err = h.WeatherService.Create(ctx, farmID, req.ToCommand()); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if err = h.weatherService.Create(ctx, farmID, req.ToCommand()); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dWeather.SuccessCreated, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dWeather.SuccessCreated, nil)
 }
 
 func (h *Handler) GetByFarmID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.ioHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dWeather.ErrInvalidFarmID, nil)
+		h.ioHandler.WriteError(ctx, w, dWeather.ErrInvalidFarmID, nil)
 		return
 	}
 
-	result, err := h.WeatherService.GetByFarmID(ctx, farmID)
+	result, err := h.weatherService.GetByFarmID(ctx, farmID)
 	if err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
@@ -68,57 +71,60 @@ func (h *Handler) GetByFarmID(w http.ResponseWriter, r *http.Request) {
 		weatherResponse[i] = DomainToWeatherResponse(res)
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusOK, weatherResponse)
+	h.ioHandler.WriteResponseBody(w, http.StatusOK, weatherResponse)
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.ioHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dWeather.ErrInvalidFarmID, nil)
+		h.ioHandler.WriteError(ctx, w, dWeather.ErrInvalidFarmID, nil)
 		return
 	}
 
-	weatherID, err := h.IoHandler.IdentifierFromPathValue(r, "weather_id")
+	weatherID, err := h.ioHandler.IdentifierFromPathValue(r, "weather_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dWeather.ErrInvalidID, nil)
+		h.ioHandler.WriteError(ctx, w, dWeather.ErrInvalidID, nil)
 		return
 	}
 
 	var req request.WeatherRequest
-	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+	if err = h.ioHandler.ReadRequestBody(r, &req); err != nil {
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+		return
+	}
+	if !h.ioHandler.ValidateStruct(ctx, w, req) {
 		return
 	}
 
-	if err = h.WeatherService.Update(ctx, farmID, weatherID, req.ToCommand()); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if err = h.weatherService.Update(ctx, farmID, weatherID, req.ToCommand()); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dWeather.SuccessUpdated, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dWeather.SuccessUpdated, nil)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.ioHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dWeather.ErrInvalidFarmID, nil)
+		h.ioHandler.WriteError(ctx, w, dWeather.ErrInvalidFarmID, nil)
 		return
 	}
 
-	weatherID, err := h.IoHandler.IdentifierFromPathValue(r, "weather_id")
+	weatherID, err := h.ioHandler.IdentifierFromPathValue(r, "weather_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dWeather.ErrInvalidID, nil)
+		h.ioHandler.WriteError(ctx, w, dWeather.ErrInvalidID, nil)
 		return
 	}
 
-	if err = h.WeatherService.Delete(ctx, farmID, weatherID); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if err = h.weatherService.Delete(ctx, farmID, weatherID); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dWeather.SuccessDeleted, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dWeather.SuccessDeleted, nil)
 }

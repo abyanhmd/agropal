@@ -1,7 +1,7 @@
 package product
 
 import (
-	dAuth "agropal/internal/domain/auth"
+	"agropal/config"
 	dNote "agropal/internal/domain/note"
 	dProduct "agropal/internal/domain/product"
 	"agropal/internal/domain/shared"
@@ -157,7 +157,7 @@ func (s *Service) verifyFarm(ctx context.Context, farmID uuid.UUID) error {
 			return err
 		}
 		requesterRole := shared.GetMetadata(ctx, shared.KeyRole)
-		if farm.UserID != user.ID && requesterRole != string(dAuth.RoleAdmin) {
+		if farm.UserID != user.ID && requesterRole != string(config.RoleAdmin) {
 			return shared.ErrForbidden
 		}
 		return nil

@@ -14,12 +14,18 @@ import (
 	"agropal/internal/domain/shared"
 	"agropal/internal/infra/crypto"
 	"agropal/internal/infra/database"
+	"agropal/internal/infra/queue"
 	"agropal/internal/utils"
 	"agropal/pkg"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 )
 
 func main() {
@@ -40,36 +46,80 @@ func main() {
 	}()
 	logger.Info(ctx, shared.System, "Connected to PostgreSQL Database")
 
+	redis := database.NewRedis(cfg)
+
+	/* Message Queue */
+	mq, err := queue.NewRabbitMQ(cfg, logger)
+	if err != nil {
+		logger.Fatal(ctx, shared.System, fmt.Sprintf("Failed to connect to RabbitMQ: %v", err))
+	}
+	defer func() {
+		if errClose := mq.Close(); errClose != nil {
+			logger.Error(ctx, shared.System, fmt.Sprintf("Error closing RabbitMQ: %v", errClose))
+		}
+	}()
+	logger.Info(ctx, shared.System, "Connected to RabbitMQ")
+
 	/* Migration */
 
 	/* Toolkit */
 	enc := crypto.NewEncryption(logger, cfg)
-	toolkit := app.NewToolkit(logger, cfg, enc, db)
+	toolkit := app.NewToolkit(logger, cfg, enc, db, redis, mq)
 	container := app.NewContainer(toolkit)
 
 	/* HTTP */
-	ioHandler := utils.NewIOHandler(logger, nil)
+	ioHandler := utils.NewIOHandler(logger, nil, utils.NewValidator())
 	mw := middleware.NewMiddleware(ioHandler, container.JWT)
 
 	mux := http.NewServeMux()
 
+	// Logger runs on every request; RequireAuth only guards protected routes.
+	publicStack := middleware.CreateStack(mw.Logger(), mw.RateLimiter(5, 10))
+	protectedStack := middleware.CreateStack(mw.Logger(), mw.RateLimiter(5, 10), mw.RequireAuth)
+
 	// Auth endpoints are unauthenticated by definition.
 	authHandler := interfaceAuth.NewHandler(ioHandler, container.Auth.Service)
-	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
-	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
-	mux.HandleFunc("POST /api/v1/auth/refresh", authHandler.Refresh)
-	mux.HandleFunc("POST /api/v1/auth/logout", authHandler.Logout)
+	mux.Handle("POST /api/v1/auth/register", publicStack(http.HandlerFunc(authHandler.Register)))
+	mux.Handle("POST /api/v1/auth/register/verify", publicStack(http.HandlerFunc(authHandler.VerifyRegister)))
+	mux.Handle("POST /api/v1/auth/login", publicStack(http.HandlerFunc(authHandler.Login)))
+	mux.Handle("POST /api/v1/auth/login/verify", publicStack(http.HandlerFunc(authHandler.VerifyLogin)))
+	mux.Handle("POST /api/v1/auth/refresh", publicStack(http.HandlerFunc(authHandler.Refresh)))
+	mux.Handle("POST /api/v1/auth/logout", publicStack(http.HandlerFunc(authHandler.Logout)))
+	mux.Handle("POST /api/v1/auth/reset-password/request", publicStack(http.HandlerFunc(authHandler.RequestPasswordReset)))
+	mux.Handle("POST /api/v1/auth/reset-password/confirm", publicStack(http.HandlerFunc(authHandler.ConfirmPasswordReset)))
 
-	apiFarm.NewRouter(mux, mw.RequireAuth, apiFarm.NewHandler(ioHandler, container.Farm.Service))
-	apiWeather.NewRouter(mux, mw.RequireAuth, apiWeather.NewHandler(ioHandler, container.Weather.Service))
-	apiProduct.NewRouter(mux, mw.RequireAuth, apiProduct.NewHandler(ioHandler, container.Product.Service))
-	apiTransaction.NewRouter(mux, mw.RequireAuth, apiTransaction.NewHandler(ioHandler, container.Transaction.Service))
-	apiUser.NewRouter(mux, mw.RequireAuth, apiUser.NewHandler(ioHandler, container.User.Service))
-	apiPost.NewRouter(mux, mw.RequireAuth, apiPost.NewHandler(ioHandler, container.Post.Service))
+	apiFarm.NewRouter(mux, protectedStack, mw, apiFarm.NewHandler(ioHandler, container.Farm.Service))
+	apiWeather.NewRouter(mux, protectedStack, mw, apiWeather.NewHandler(ioHandler, container.Weather.Service))
+	apiProduct.NewRouter(mux, protectedStack, mw, apiProduct.NewHandler(ioHandler, container.Product.Service))
+	apiTransaction.NewRouter(mux, protectedStack, mw, apiTransaction.NewHandler(ioHandler, container.Transaction.Service))
+	apiUser.NewRouter(mux, protectedStack, mw, apiUser.NewHandler(ioHandler, container.User.Service))
+	apiPost.NewRouter(mux, protectedStack, mw, apiPost.NewHandler(ioHandler, container.Post.Service))
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
-	logger.Info(ctx, shared.System, fmt.Sprintf("Listening on %s", addr))
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		logger.Error(ctx, shared.System, fmt.Sprintf("Server stopped: %v", err))
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+
+	go func() {
+		logger.Info(ctx, shared.System, fmt.Sprintf("Listening on %s", addr))
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error(ctx, shared.System, fmt.Sprintf("Server error: %v", err))
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	logger.Info(ctx, shared.System, "Shutting down server")
+
+	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Error(ctx, shared.System, fmt.Sprintf("Graceful shutdown failed: %v", err))
+	} else {
+		logger.Info(ctx, shared.System, "Server stopped gracefully")
 	}
 }

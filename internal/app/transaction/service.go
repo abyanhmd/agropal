@@ -1,7 +1,7 @@
 package transaction
 
 import (
-	dAuth "agropal/internal/domain/auth"
+	"agropal/config"
 	dFarm "agropal/internal/domain/farm"
 	dProduct "agropal/internal/domain/product"
 	"agropal/internal/domain/shared"
@@ -201,7 +201,7 @@ func (s *Service) verifyProduct(ctx context.Context, farmID, productID uuid.UUID
 			return err
 		}
 		requesterRole := shared.GetMetadata(ctx, shared.KeyRole)
-		if farm.UserID != user.ID && requesterRole != string(dAuth.RoleAdmin) {
+		if farm.UserID != user.ID && requesterRole != string(config.RoleAdmin) {
 			return shared.ErrForbidden
 		}
 		if productID == uuid.Nil {

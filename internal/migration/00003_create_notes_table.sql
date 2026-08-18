@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE IF NOT EXISTS notes (
     note_id UUID PRIMARY KEY,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -10,3 +11,6 @@ CREATE TABLE IF NOT EXISTS notes (
     author_id UUID NOT NULL REFERENCES users(user_id),
     is_system_log BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS notes;

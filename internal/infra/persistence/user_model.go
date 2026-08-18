@@ -1,7 +1,7 @@
 package persistence
 
 import (
-	dAuth "agropal/internal/domain/auth"
+	"agropal/config"
 	dUser "agropal/internal/domain/user"
 	"time"
 
@@ -17,10 +17,11 @@ type UserModel struct {
 	Password string    `db:"password"`
 	Role     string    `db:"role"`
 
-	CreatedAt   time.Time  `db:"created_at"`
-	UpdatedAt   *time.Time `db:"updated_at"`
-	DeletedAt   *time.Time `db:"deleted_at"`
-	LastLoginAt *time.Time `db:"last_login_at"`
+	CreatedAt       time.Time  `db:"created_at"`
+	UpdatedAt       *time.Time `db:"updated_at"`
+	DeletedAt       *time.Time `db:"deleted_at"`
+	LastLoginAt     *time.Time `db:"last_login_at"`
+	EmailVerifiedAt *time.Time `db:"email_verified_at"`
 }
 
 func ToUserModel(domain dUser.User) UserModel {
@@ -35,10 +36,11 @@ func ToUserModel(domain dUser.User) UserModel {
 		Password: domain.Security.Password,
 		Role:     string(domain.Security.Role),
 
-		CreatedAt:   domain.Metadata.CreatedAt,
-		UpdatedAt:   domain.Metadata.UpdatedAt,
-		DeletedAt:   domain.Metadata.DeletedAt,
-		LastLoginAt: domain.Metadata.LastLoginAt,
+		CreatedAt:       domain.Metadata.CreatedAt,
+		UpdatedAt:       domain.Metadata.UpdatedAt,
+		DeletedAt:       domain.Metadata.DeletedAt,
+		LastLoginAt:     domain.Metadata.LastLoginAt,
+		EmailVerifiedAt: domain.Metadata.EmailVerifiedAt,
 	}
 }
 
@@ -53,13 +55,14 @@ func (m UserModel) ToDomain() dUser.User {
 		},
 		Security: dUser.SecurityInfo{
 			Password: m.Password,
-			Role:     dAuth.Role(m.Role),
+			Role:     config.Role(m.Role),
 		},
 		Metadata: dUser.UserMetadata{
-			CreatedAt:   m.CreatedAt,
-			UpdatedAt:   m.UpdatedAt,
-			DeletedAt:   m.DeletedAt,
-			LastLoginAt: m.LastLoginAt,
+			CreatedAt:       m.CreatedAt,
+			UpdatedAt:       m.UpdatedAt,
+			DeletedAt:       m.DeletedAt,
+			LastLoginAt:     m.LastLoginAt,
+			EmailVerifiedAt: m.EmailVerifiedAt,
 		},
 	}
 }

@@ -1,7 +1,7 @@
 package user
 
 import (
-	dAuth "agropal/internal/domain/auth"
+	"agropal/config"
 	"agropal/internal/domain/shared"
 	"time"
 
@@ -24,14 +24,15 @@ type AccountInfo struct {
 
 type SecurityInfo struct {
 	Password string
-	Role     dAuth.Role
+	Role     config.Role
 }
 
 type UserMetadata struct {
-	CreatedAt   time.Time
-	UpdatedAt   *time.Time
-	DeletedAt   *time.Time
-	LastLoginAt *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       *time.Time
+	DeletedAt       *time.Time
+	LastLoginAt     *time.Time
+	EmailVerifiedAt *time.Time
 }
 
 var (

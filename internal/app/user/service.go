@@ -1,7 +1,7 @@
 package user
 
 import (
-	dAuth "agropal/internal/domain/auth"
+	"agropal/config"
 	dNote "agropal/internal/domain/note"
 	"agropal/internal/domain/shared"
 	dUser "agropal/internal/domain/user"
@@ -163,7 +163,7 @@ func (s *Service) verifyAccess(ctx context.Context, targetID uuid.UUID) (dUser.U
 	requesterRole := shared.GetMetadata(ctx, shared.KeyRole)
 
 	isSelf := targetID == requesterID
-	isAdmin := requesterRole == string(dAuth.RoleAdmin)
+	isAdmin := requesterRole == string(config.RoleAdmin)
 
 	if !isSelf && !isAdmin {
 		return dUser.User{}, shared.ErrForbidden

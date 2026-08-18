@@ -10,9 +10,9 @@ import (
 // create endpoint (all fields required, validated by the handler) and the
 // partial-update endpoint (only the supplied fields are considered).
 type ProductRequest struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
-	Image       *string `json:"image"`
+	Name        *string `json:"name" validate:"required"`
+	Description *string `json:"description" validate:"required"`
+	Image       *string `json:"image" validate:"required"`
 }
 
 func (p *ProductRequest) ToCommand() aProduct.ProductCommand {
@@ -24,9 +24,9 @@ func (p *ProductRequest) ToCommand() aProduct.ProductCommand {
 }
 
 type ProductStockRequest struct {
-	DateAdded *time.Time `json:"date_added"`
-	Type      *string    `json:"type"`
-	Stock     *float64   `json:"stock"`
+	DateAdded *time.Time `json:"date_added" validate:"required"`
+	Type      *string    `json:"type" validate:"required,oneof=IN OUT"`
+	Stock     *float64   `json:"stock" validate:"required,gt=0"`
 }
 
 func (p *ProductStockRequest) ToCommand() aProduct.ProductStockCommand {
@@ -44,8 +44,8 @@ func (p *ProductStockRequest) ToCommand() aProduct.ProductStockCommand {
 }
 
 type ProductPriceRequest struct {
-	DateAdded *time.Time `json:"date_added"`
-	Price     *float64   `json:"price"`
+	DateAdded *time.Time `json:"date_added" validate:"required"`
+	Price     *float64   `json:"price" validate:"required,gt=0"`
 }
 
 func (p *ProductPriceRequest) ToCommand() aProduct.ProductPriceCommand {

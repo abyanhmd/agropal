@@ -13,8 +13,8 @@ import (
 )
 
 type Handler struct {
-	IoHandler          *utils.IOHandler
-	TransactionService *aTransaction.Service
+	ioHandler          *utils.IOHandler
+	transactionService *aTransaction.Service
 }
 
 func NewHandler(
@@ -22,68 +22,71 @@ func NewHandler(
 	transactionService *aTransaction.Service,
 ) Handler {
 	return Handler{
-		IoHandler:          ioHandler,
-		TransactionService: transactionService,
+		ioHandler:          ioHandler,
+		transactionService: transactionService,
 	}
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.ioHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidProductID, nil)
+		h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidProductID, nil)
 		return
 	}
 
-	productID, err := h.IoHandler.IdentifierFromPathValue(r, "product_id")
+	productID, err := h.ioHandler.IdentifierFromPathValue(r, "product_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidProductID, nil)
+		h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidProductID, nil)
 		return
 	}
 
 	var req request.CreateTransactionsRequest
-	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+	if err = h.ioHandler.ReadRequestBody(r, &req); err != nil {
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+		return
+	}
+	if !h.ioHandler.ValidateStruct(ctx, w, req) {
 		return
 	}
 
-	if err = h.TransactionService.Create(ctx, farmID, productID, req.ToCommands()); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if err = h.transactionService.Create(ctx, farmID, productID, req.ToCommands()); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dTransaction.SuccessCreated, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dTransaction.SuccessCreated, nil)
 }
 
 func (h *Handler) GetOne(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.ioHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
+		h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
 		return
 	}
 
-	productID, err := h.IoHandler.IdentifierFromPathValue(r, "product_id")
+	productID, err := h.ioHandler.IdentifierFromPathValue(r, "product_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidProductID, nil)
+		h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidProductID, nil)
 		return
 	}
 
-	transactionID, err := h.IoHandler.IdentifierFromPathValue(r, "transaction_id")
+	transactionID, err := h.ioHandler.IdentifierFromPathValue(r, "transaction_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
+		h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
 		return
 	}
 
-	result, err := h.TransactionService.GetOne(ctx, farmID, productID, transactionID)
+	result, err := h.transactionService.GetOne(ctx, farmID, productID, transactionID)
 	if err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusOK, DomainToTransactionResponse(result))
+	h.ioHandler.WriteResponseBody(w, http.StatusOK, DomainToTransactionResponse(result))
 }
 
 // GetMany lists transactions for a farm, or for a single product within
@@ -91,9 +94,9 @@ func (h *Handler) GetOne(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetMany(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.ioHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
+		h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
 		return
 	}
 
@@ -101,15 +104,15 @@ func (h *Handler) GetMany(w http.ResponseWriter, r *http.Request) {
 	if productIDStr := r.PathValue("product_id"); productIDStr != "" {
 		productID, errParse := uuid.Parse(productIDStr)
 		if errParse != nil {
-			h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidProductID, nil)
+			h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidProductID, nil)
 			return
 		}
-		result, err = h.TransactionService.ListByProductID(ctx, farmID, productID)
+		result, err = h.transactionService.ListByProductID(ctx, farmID, productID)
 	} else {
-		result, err = h.TransactionService.ListByFarmID(ctx, farmID)
+		result, err = h.transactionService.ListByFarmID(ctx, farmID)
 	}
 	if err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
@@ -118,42 +121,45 @@ func (h *Handler) GetMany(w http.ResponseWriter, r *http.Request) {
 		transactionResponse[i] = DomainToTransactionResponse(res)
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusOK, transactionResponse)
+	h.ioHandler.WriteResponseBody(w, http.StatusOK, transactionResponse)
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.ioHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
+		h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
 		return
 	}
 
-	productID, err := h.IoHandler.IdentifierFromPathValue(r, "product_id")
+	productID, err := h.ioHandler.IdentifierFromPathValue(r, "product_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidProductID, nil)
+		h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidProductID, nil)
 		return
 	}
 
-	transactionID, err := h.IoHandler.IdentifierFromPathValue(r, "transaction_id")
+	transactionID, err := h.ioHandler.IdentifierFromPathValue(r, "transaction_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
+		h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
 		return
 	}
 
 	var req request.TransactionRequest
-	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+	if err = h.ioHandler.ReadRequestBody(r, &req); err != nil {
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+		return
+	}
+	if !h.ioHandler.ValidateStruct(ctx, w, req) {
 		return
 	}
 
-	if err = h.TransactionService.Update(ctx, farmID, productID, transactionID, req.ToCommand()); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if err = h.transactionService.Update(ctx, farmID, productID, transactionID, req.ToCommand()); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dTransaction.SuccessUpdated, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dTransaction.SuccessUpdated, nil)
 }
 
 // Delete removes a set of transactions scoped to a farm/product, given a
@@ -161,36 +167,36 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.ioHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
+		h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
 		return
 	}
 
-	productID, err := h.IoHandler.IdentifierFromPathValue(r, "product_id")
+	productID, err := h.ioHandler.IdentifierFromPathValue(r, "product_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidProductID, nil)
+		h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidProductID, nil)
 		return
 	}
 
 	var req request.DeleteTransactionsRequest
-	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+	if err = h.ioHandler.ReadRequestBody(r, &req); err != nil {
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
 	}
 
 	transactionIDs, err := parseUUIDs(req.TransactionIDs)
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
+		h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
 		return
 	}
 
-	if err = h.TransactionService.Delete(ctx, farmID, productID, transactionIDs); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if err = h.transactionService.Delete(ctx, farmID, productID, transactionIDs); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dTransaction.SuccessDeleted, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dTransaction.SuccessDeleted, nil)
 }
 
 // DeleteMany removes an arbitrary set of transactions the requester has
@@ -199,35 +205,35 @@ func (h *Handler) DeleteMany(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var req request.DeleteTransactionsRequest
-	if err := h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+	if err := h.ioHandler.ReadRequestBody(r, &req); err != nil {
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
 	}
 
 	transactionIDs, err := parseUUIDs(req.TransactionIDs)
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
+		h.ioHandler.WriteError(ctx, w, dTransaction.ErrInvalidID, nil)
 		return
 	}
 
-	if err = h.TransactionService.DeleteMany(ctx, transactionIDs); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if err = h.transactionService.DeleteMany(ctx, transactionIDs); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dTransaction.SuccessDeleted, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dTransaction.SuccessDeleted, nil)
 }
 
 // DeleteAll removes every transaction across every farm the requester owns.
 func (h *Handler) DeleteAll(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	if err := h.TransactionService.DeleteAll(ctx); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if err := h.transactionService.DeleteAll(ctx); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dTransaction.SuccessDeleted, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dTransaction.SuccessDeleted, nil)
 }
 
 func parseUUIDs(ids []string) ([]uuid.UUID, error) {

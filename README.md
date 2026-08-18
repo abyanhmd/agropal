@@ -33,8 +33,8 @@ Within `internal/app`, `container.go` wires every service's dependencies (reposi
 backend/
 ├── cmd/
 │   ├── api/                  # HTTP server entry point (main.go)
-│   ├── email/                # (scaffolded, empty)
-│   └── migration/            # (scaffolded, empty; migrations currently run manually)
+│   ├── email/                # email worker: consumes queue.QueueNameEmail, sends via SMTP
+│   └── migration/            # goose migration runner entry point (main.go)
 ├── config/                   # config.yaml + env-backed Config loader
 ├── internal/
 │   ├── api/                  # HTTP layer, one package per domain
@@ -53,9 +53,11 @@ backend/
 │   ├── infra/
 │   │   ├── crypto/           #   JWT signing/validation, AES-GCM encryption
 │   │   ├── database/         #   Postgres connection + transactor
+│   │   ├── email/             #   SMTP sender + verification email templates
 │   │   ├── identity/         #   ID/token generators
+│   │   ├── queue/            #   RabbitMQ publish/consume
 │   │   └── persistence/      #   sqlx-based repository implementations
-│   ├── migration/            # raw SQL migrations (up/down pairs)
+│   ├── migration/            # goose SQL migrations (one file per version, Up+Down)
 │   ├── request/               # HTTP request DTOs + ToCommand() mappers
 │   ├── response/              # HTTP response DTOs + error/success registries
 │   └── utils/                 # IOHandler (JSON I/O + response envelopes), validators
@@ -81,6 +83,8 @@ All routes are mounted under `/api/v1`. Everything except `/auth/*` requires `Au
 
 Mutating endpoints (`POST` create, `PATCH`, `DELETE`) respond with a success envelope (`{info: {code, key, message}, data, request_id}`) instead of a bare status with no body. `key`/`message` are looked up in `response.SuccessRegistry` (`internal/response/registry_success.go`) by the domain's `SuccessKey` (e.g. `dFarm.SuccessCreated` → `"FARM.CREATE_SUCCESS"`), defined alongside each domain's error keys in `internal/domain/<domain>/entity.go`. `GET` endpoints and `POST /auth/login`/`/auth/refresh` return the raw DTO instead, and errors use the equivalent `ErrorRegistry`-backed envelope. See `docs/openapi.yaml` and `docs/README.md` for the full endpoint-by-endpoint mapping.
 
+Request bodies are validated with [go-playground/validator](https://github.com/go-playground/validator) via `validate` struct tags on the `internal/request` DTOs (`internal/utils/validate.go`). A handler calls `ioHandler.ValidateStruct(ctx, w, req)` right after decoding the body; on failure it writes the `COMMON.VALIDATION_FAILED` error with the envelope's `errors` field populated as `{field: [messages]}`, one entry per failing field. Endpoints with validation semantics that don't map cleanly onto struct tags (e.g. auth's email/password rules, which need specific per-rule error keys) keep their own hand-written checks in `internal/api/<domain>/mapper.go` instead.
+
 ## Getting Started
 
 ### Prerequisites
@@ -105,16 +109,32 @@ REDIS_PASSWORD=
 REDIS_DB=
 REDIS_PROTOCOL=
 
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USERNAME=
+SMTP_FROM=
+
 SECRET_JWT=
 SECRET_GCM_TOKEN=
 SECRET_SMTP=
 ```
 
+`SECRET_SMTP` is the SMTP account's password/app-password; `SMTP_USERNAME`/`SMTP_FROM` are usually the same address.
+
 Server and path settings (host, port, migration/log paths) live in `backend/config/config.yaml`.
 
 ### Database
 
-Apply the SQL files under `internal/migration/` (numbered `up`/`down` pairs) against your Postgres instance in order; there's no migration runner wired up yet (`cmd/migration` is a placeholder).
+Migrations are managed with [goose](https://github.com/pressly/goose) via `cmd/migration`. Each file under `internal/migration/` contains both the `-- +goose Up` and `-- +goose Down` sections for one migration.
+
+```bash
+go run ./cmd/migration up       # apply all pending migrations
+go run ./cmd/migration down     # roll back the most recent migration
+go run ./cmd/migration status   # show applied/pending migrations
+go run ./cmd/migration redo     # roll back and reapply the last migration
+```
+
+To add a new migration, create a file like `internal/migration/00008_<name>.sql` with `-- +goose Up` / `-- +goose Down` sections, or generate the skeleton with the goose CLI (`goose -dir internal/migration create <name> sql`).
 
 ### Running
 
@@ -123,7 +143,23 @@ cd backend
 go run ./cmd/api
 ```
 
-The server listens on the host/port from `config/config.yaml` (default `localhost:8080`).
+The server listens on the host/port from `config/config.yaml` (`0.0.0.0:8080`, reachable at `localhost:8080` locally).
+
+Run the email worker (requires RabbitMQ and the `SMTP_*`/`SECRET_SMTP` env vars) alongside it to actually deliver verification codes:
+
+```bash
+go run ./cmd/email
+```
+
+### Running with Docker
+
+```bash
+docker compose -f docker-compose-local.yaml up --build
+```
+
+This builds and runs `go-api`, `go-migrate` (applies migrations once, then exits), `go-worker-email`, plus Postgres/Redis/RabbitMQ and a Traefik reverse proxy, all wired together on an internal Docker network. The api is reachable at `http://api.localhost` (routed through Traefik on port 80), RabbitMQ's management UI at `http://rabbitmq.localhost` or `localhost:15672`.
+
+`.env`'s `POSTGRES_HOST`/`REDIS_ADDRESS`/`RABBITMQ_ADDRESS` are written for running the binaries directly on the host (`go run`); the compose file overrides those three per-service to the in-network container names (`postgres`, `redis`, `rabbitmq`) so the containerized services can actually reach each other. If you add a new inter-service dependency, remember to add the matching override rather than relying on `.env`'s host values.
 
 ### Build & verify
 
@@ -148,7 +184,6 @@ There is no automated test suite yet.
 ## Known Limitations
 
 - Not every mutation has a dedicated success key yet; post/comment engagement endpoints (`POST /post/{post_id}/engagement`, `POST /comment/{comment_id}/engagement`) still return a bare `201` with no body.
-- Struct `validate` tags exist on several commands but no validation library is wired in yet; they're currently documentation only.
 - `app/product`'s `UpdateProduct` records an audit note for changed fields but doesn't yet persist the new values.
-- `cmd/email`, `cmd/migration`, and `boilerplate/*` are scaffolded but empty.
+- `boilerplate/*` is scaffolded but empty.
 - No automated tests.

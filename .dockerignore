@@ -1,0 +1,9 @@
+.env
+.env.*
+logs/
+data/
+*.md
+docker-compose*.yaml
+docker-compose*.yml
+.idea/
+.vscode/

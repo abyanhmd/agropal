@@ -11,8 +11,8 @@ import (
 )
 
 type Handler struct {
-	IoHandler   *utils.IOHandler
-	FarmService *aFarm.Service
+	ioHandler   *utils.IOHandler
+	farmService *aFarm.Service
 }
 
 func NewHandler(
@@ -20,8 +20,8 @@ func NewHandler(
 	farmService *aFarm.Service,
 ) Handler {
 	return Handler{
-		IoHandler:   ioHandler,
-		FarmService: farmService,
+		ioHandler:   ioHandler,
+		farmService: farmService,
 	}
 }
 
@@ -29,47 +29,46 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var req request.FarmRequest
-	if err := h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+	if err := h.ioHandler.ReadRequestBody(r, &req); err != nil {
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
 	}
-	if req.Name == "" {
-		h.IoHandler.WriteError(ctx, w, dFarm.ErrInvalidName, nil)
-		return
-	}
-
-	if err := h.FarmService.Create(ctx, req.ToCommand()); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if !h.ioHandler.ValidateStruct(ctx, w, req) {
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dFarm.SuccessCreated, nil)
+	if err := h.farmService.Create(ctx, req.ToCommand()); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
+		return
+	}
+
+	h.ioHandler.WriteSuccess(ctx, w, dFarm.SuccessCreated, nil)
 }
 
 func (h *Handler) GetOne(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.ioHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dFarm.ErrInvalidID, nil)
+		h.ioHandler.WriteError(ctx, w, dFarm.ErrInvalidID, nil)
 		return
 	}
 
-	result, err := h.FarmService.GetOne(ctx, farmID)
+	result, err := h.farmService.GetOne(ctx, farmID)
 	if err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusOK, DomainToFarmResponse(result))
+	h.ioHandler.WriteResponseBody(w, http.StatusOK, DomainToFarmResponse(result))
 }
 
 func (h *Handler) GetMany(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	result, err := h.FarmService.GetMany(ctx)
+	result, err := h.farmService.GetMany(ctx)
 	if err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
@@ -78,45 +77,48 @@ func (h *Handler) GetMany(w http.ResponseWriter, r *http.Request) {
 		farmResponse[i] = DomainToFarmResponse(res)
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusOK, farmResponse)
+	h.ioHandler.WriteResponseBody(w, http.StatusOK, farmResponse)
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.ioHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dFarm.ErrInvalidID, nil)
+		h.ioHandler.WriteError(ctx, w, dFarm.ErrInvalidID, nil)
 		return
 	}
 
 	var req request.FarmRequest
-	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+	if err = h.ioHandler.ReadRequestBody(r, &req); err != nil {
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+		return
+	}
+	if !h.ioHandler.ValidateStruct(ctx, w, req) {
 		return
 	}
 
-	if err = h.FarmService.Update(ctx, farmID, req.ToCommand()); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if err = h.farmService.Update(ctx, farmID, req.ToCommand()); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dFarm.SuccessUpdated, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dFarm.SuccessUpdated, nil)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	farmID, err := h.IoHandler.IdentifierFromPathValue(r, "farm_id")
+	farmID, err := h.ioHandler.IdentifierFromPathValue(r, "farm_id")
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dFarm.ErrInvalidID, nil)
+		h.ioHandler.WriteError(ctx, w, dFarm.ErrInvalidID, nil)
 		return
 	}
 
-	if err = h.FarmService.Delete(ctx, farmID); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if err = h.farmService.Delete(ctx, farmID); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dFarm.SuccessDeleted, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dFarm.SuccessDeleted, nil)
 }

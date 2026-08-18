@@ -26,6 +26,7 @@ var ErrorRegistry = map[shared.ErrorKey]ResponseDetail{
 	shared.ErrGatewayTimeout:     {HTTPCode: 504, Message: "The request timed out."},                    // "COMMON.GATEWAY_TIMEOUT"
 	shared.ErrInvalidInput:       {HTTPCode: 400, Message: "The provided input is invalid."},            // "COMMON.INVALID_INPUT"
 	shared.ErrDatabaseError:      {HTTPCode: 500, Message: "A database error occurred."},                // "COMMON.DATABASE_ERROR"
+	shared.ErrValidation:         {HTTPCode: 400, Message: "One or more fields failed validation."},     // "COMMON.VALIDATION_FAILED"
 
 	// AUTH
 	dAuth.ErrAlreadyRegistered:     {HTTPCode: 409, Message: "This account is already registered."},            // "AUTH.ALREADY_REGISTERED"

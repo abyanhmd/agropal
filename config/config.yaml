@@ -1,7 +1,7 @@
 stage: "dev"
 server:
-  host: "localhost"
+  host: "0.0.0.0"
   port: 8080
 path:
-  migration: "internal/migrations"
+  migration: "internal/migration"
   log: "logs"

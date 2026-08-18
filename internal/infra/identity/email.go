@@ -6,7 +6,7 @@ import (
 )
 
 func (g *Generator) GenerateOTP() string {
-	lengthOTP := 4
+	lengthOTP := 6
 	digits := []byte("0123456789")
 
 	otp := make([]byte, lengthOTP)
@@ -20,7 +20,7 @@ func (g *Generator) GenerateOTP() string {
 }
 
 func (g *Generator) GenerateReferral() string {
-	lengthReferral := 6
+	lengthReferral := 8
 	charsets := []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 	referral := make([]byte, lengthReferral)

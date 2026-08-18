@@ -1,7 +1,7 @@
 package auth
 
 import (
-	dAuth "agropal/internal/domain/auth"
+	"agropal/config"
 	dUser "agropal/internal/domain/user"
 
 	"github.com/google/uuid"
@@ -42,7 +42,7 @@ func (c CreateUserCommand) ToDomain(userID uuid.UUID) dUser.User {
 		},
 		Security: dUser.SecurityInfo{
 			Password: c.Password,
-			Role:     dAuth.RoleUser,
+			Role:     config.RoleUser,
 		},
 	}
 }

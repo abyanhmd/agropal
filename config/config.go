@@ -16,7 +16,7 @@ type Config struct {
 	Path struct {
 		Migration string `yaml:"migration"`
 		Log       string `yaml:"log"`
-	}
+	} `yaml:"path"`
 	Database struct {
 		Host     string `mapstructure:"host"`
 		Port     string `mapstructure:"port"`
@@ -25,16 +25,28 @@ type Config struct {
 		Dbname   string `mapstructure:"dbname"`
 	} `mapstructure:"postgres"`
 	Redis struct {
-		Address  string
-		Password string
-		Db       int
-		Protocol int
-	}
+		Address  string `mapstructure:"address"`
+		Password string `mapstructure:"password"`
+		Db       int    `mapstructure:"db"`
+		Protocol int    `mapstructure:"protocol"`
+	} `mapstructure:"redis"`
+	RabbitMQ struct {
+		Address  string `mapstructure:"address"`
+		URL      string `mapstructure:"url"`
+		Username string `mapstructure:"username"`
+		Password string `mapstructure:"password"`
+	} `mapstructure:"rabbitmq"`
+	Smtp struct {
+		Host     string `mapstructure:"host"`
+		Port     string `mapstructure:"port"`
+		Username string `mapstructure:"username"`
+		From     string `mapstructure:"from"`
+	} `mapstructure:"smtp"`
 	Secret struct {
-		Jwt      string
-		GcmToken string
-		Smtp     string
-	}
+		Jwt      string `mapstructure:"jwt"`
+		GcmToken string `mapstructure:"gcm_token"`
+		Smtp     string `mapstructure:"smtp"`
+	} `mapstructure:"secret"`
 }
 
 func LoadConfig(path string) *Config {
@@ -59,9 +71,19 @@ func LoadConfig(path string) *Config {
 		"redis.db":       "REDIS_DB",
 		"redis.protocol": "REDIS_PROTOCOL",
 
-		"secret.jwt":      "SECRET_JWT",
-		"secret.gcmtoken": "SECRET_GCM_TOKEN",
-		"secret.smtp":     "SECRET_SMTP",
+		"rabbitmq.address":  "RABBITMQ_ADDRESS",
+		"rabbitmq.url":      "RABBITMQ_URL",
+		"rabbitmq.username": "RABBITMQ_USERNAME",
+		"rabbitmq.password": "RABBITMQ_PASSWORD",
+
+		"smtp.host":     "SMTP_HOST",
+		"smtp.port":     "SMTP_PORT",
+		"smtp.username": "SMTP_USERNAME",
+		"smtp.from":     "SMTP_FROM",
+
+		"secret.jwt":       "SECRET_JWT",
+		"secret.gcm_token": "SECRET_GCM_TOKEN",
+		"secret.smtp":      "SECRET_SMTP",
 	}
 
 	for key, env := range bindings {

@@ -15,8 +15,8 @@ import (
 )
 
 type Handler struct {
-	IoHandler   *utils.IOHandler
-	UserService *aUser.Service
+	ioHandler   *utils.IOHandler
+	userService *aUser.Service
 }
 
 func NewHandler(
@@ -24,8 +24,8 @@ func NewHandler(
 	userService *aUser.Service,
 ) Handler {
 	return Handler{
-		IoHandler:   tool,
-		UserService: userService,
+		ioHandler:   tool,
+		userService: userService,
 	}
 }
 
@@ -34,17 +34,17 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	userID, err := userIDFromPathValue(r)
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dUser.ErrInvalidUserID, nil)
+		h.ioHandler.WriteError(ctx, w, dUser.ErrInvalidUserID, nil)
 		return
 	}
 
-	user, err := h.UserService.GetByID(ctx, userID)
+	user, err := h.userService.GetByID(ctx, userID)
 	if err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusOK, DomainToUserResponse(user))
+	h.ioHandler.WriteResponseBody(w, http.StatusOK, DomainToUserResponse(user))
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
@@ -52,22 +52,22 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	userID, err := userIDFromPathValue(r)
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dUser.ErrInvalidUserID, nil)
+		h.ioHandler.WriteError(ctx, w, dUser.ErrInvalidUserID, nil)
 		return
 	}
 
 	var req request.UserUpdateRequest
-	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+	if err = h.ioHandler.ReadRequestBody(r, &req); err != nil {
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
 	}
 
-	if err = h.UserService.UpdateUser(ctx, req.ToCommand(userID)); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if err = h.userService.UpdateUser(ctx, req.ToCommand(userID)); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dUser.SuccessUpdated, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dUser.SuccessUpdated, nil)
 }
 
 // ChangePassword verifies the caller's current password before delegating
@@ -78,33 +78,40 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	userID, err := userIDFromPathValue(r)
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dUser.ErrInvalidUserID, nil)
+		h.ioHandler.WriteError(ctx, w, dUser.ErrInvalidUserID, nil)
 		return
 	}
 
 	var req request.ChangePasswordRequest
-	if err = h.IoHandler.ReadRequestBody(r, &req); err != nil {
-		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+	if err = h.ioHandler.ReadRequestBody(r, &req); err != nil {
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+		return
+	}
+	if !h.ioHandler.ValidateStruct(ctx, w, req) {
+		return
+	}
+	if err = utils.ValidPassword(req.NewPassword); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	user, err := h.UserService.GetByID(ctx, userID)
+	user, err := h.userService.GetByID(ctx, userID)
 	if err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
 	if err = bcrypt.CompareHashAndPassword([]byte(user.Security.Password), []byte(req.OldPassword)); err != nil {
-		h.IoHandler.WriteError(ctx, w, shared.ErrUnauthorized, nil)
+		h.ioHandler.WriteError(ctx, w, shared.ErrUnauthorized, nil)
 		return
 	}
 
-	if err = h.UserService.UpdateUserPassword(ctx, user.ID, req.NewPassword); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if err = h.userService.UpdateUserPassword(ctx, user.ID, req.NewPassword); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dUser.SuccessUpdated, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dUser.SuccessUpdated, nil)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +119,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	userID, err := userIDFromPathValue(r)
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, dUser.ErrInvalidUserID, nil)
+		h.ioHandler.WriteError(ctx, w, dUser.ErrInvalidUserID, nil)
 		return
 	}
 
@@ -123,16 +130,16 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	case "false", "":
 		deleteType = shared.DeleteSoft
 	default:
-		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
 	}
 
-	if err = h.UserService.Delete(ctx, deleteType, userID); err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+	if err = h.userService.Delete(ctx, deleteType, userID); err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.IoHandler.WriteSuccess(ctx, w, dUser.SuccessDeleted, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dUser.SuccessDeleted, nil)
 }
 
 func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {
@@ -151,19 +158,19 @@ func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	case string(shared.AssetComment):
 		assetType = shared.AssetComment
 	default:
-		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
 	}
 
 	assetID, err := uuid.Parse(r.URL.Query().Get("asset_id"))
 	if err != nil {
-		h.IoHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
 	}
 
-	users, err := h.UserService.GetUsers(ctx, assetType, assetID)
+	users, err := h.userService.GetUsers(ctx, assetType, assetID)
 	if err != nil {
-		h.IoHandler.HandleServiceError(ctx, w, err)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
@@ -172,7 +179,7 @@ func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {
 		res[i] = DomainToUserResponse(user)
 	}
 
-	h.IoHandler.WriteResponseBody(w, http.StatusOK, res)
+	h.ioHandler.WriteResponseBody(w, http.StatusOK, res)
 }
 
 // userIDFromPathValue treats the literal segment "me" as the caller

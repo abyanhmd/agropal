@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE IF NOT EXISTS transactions (
     transaction_id UUID PRIMARY KEY,
     transaction_date TIMESTAMPTZ NOT NULL,
@@ -7,3 +8,6 @@ CREATE TABLE IF NOT EXISTS transactions (
     description VARCHAR(255),
     product_id UUID REFERENCES products(product_id)
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS transactions;

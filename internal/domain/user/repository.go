@@ -17,6 +17,7 @@ type Repository interface {
 	ListUsers(ctx context.Context, q database.Querier) ([]User, error)
 	UpdateUser(ctx context.Context, q database.Querier, user User) error
 	UpdateUserPassword(ctx context.Context, q database.Querier, userID uuid.UUID, password string) error
+	VerifyUserEmail(ctx context.Context, q database.Querier, userID uuid.UUID, verifiedAt time.Time) error
 
 	SoftDeleteUser(ctx context.Context, q database.Querier, userID uuid.UUID, deletedAt time.Time) error
 	DeleteUser(ctx context.Context, q database.Querier, userID uuid.UUID) error

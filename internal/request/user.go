@@ -52,6 +52,6 @@ func (r *UserUpdateRequest) ToCommand(userID uuid.UUID) aUser.UserCommand {
 }
 
 type ChangePasswordRequest struct {
-	OldPassword string `json:"old_password"`
-	NewPassword string `json:"new_password"`
+	OldPassword string `json:"old_password" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required"`
 }

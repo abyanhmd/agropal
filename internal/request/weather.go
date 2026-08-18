@@ -5,8 +5,8 @@ import (
 )
 
 type WeatherRequest struct {
-	Longitude float64 `json:"longitude"`
-	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude" validate:"longitude"`
+	Latitude  float64 `json:"latitude" validate:"latitude"`
 }
 
 func (r *WeatherRequest) ToCommand() aWeather.WeatherCommand {

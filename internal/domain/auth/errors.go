@@ -19,11 +19,17 @@ var (
 	ErrPasswordHasNoSpecial shared.ErrorKey = "AUTH.PASSWORD_HAS_NO_SPECIAL"
 	ErrInvalidInviteCode    shared.ErrorKey = "AUTH.INVALID_INVITE_CODE"
 
+	ErrVerificationCodeNotFound shared.ErrorKey = "AUTH.VERIFICATION_CODE_NOT_FOUND"
+	ErrVerificationCodeExpired  shared.ErrorKey = "AUTH.VERIFICATION_CODE_EXPIRED"
+	ErrVerificationCodeInvalid  shared.ErrorKey = "AUTH.VERIFICATION_CODE_INVALID"
+	ErrVerificationCodeUsed     shared.ErrorKey = "AUTH.VERIFICATION_CODE_USED"
+
 	ErrInvalidCredentials shared.ErrorKey = "AUTH.INVALID_CREDENTIALS"
 	ErrAccountDisabled    shared.ErrorKey = "AUTH.ACCOUNT_DISABLED"
 	ErrAccountLocked      shared.ErrorKey = "AUTH.ACCOUNT_LOCKED"
 	ErrAccountNotFound    shared.ErrorKey = "AUTH.ACCOUNT_NOT_FOUND"
 	ErrLoginRequired      shared.ErrorKey = "AUTH.LOGIN_REQUIRED"
+	ErrEmailNotVerified   shared.ErrorKey = "AUTH.EMAIL_NOT_VERIFIED"
 
 	ErrTokenExpired   shared.ErrorKey = "AUTH.TOKEN_EXPIRED"
 	ErrTokenInvalid   shared.ErrorKey = "AUTH.TOKEN_INVALID"
