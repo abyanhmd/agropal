@@ -19,7 +19,7 @@ type ProductStockModel struct {
 	ID        uuid.UUID `db:"stock_id"`
 	ProductID uuid.UUID `db:"product_id"`
 	CreatedAt time.Time `db:"created_at"`
-	Type      string    `db:"type"`
+	Type      string    `db:"stock_type"`
 	Quantity  float64   `db:"quantity"`
 }
 

@@ -21,5 +21,4 @@ type Repository interface {
 	ListCommentReplies(ctx context.Context, q database.Querier, parentID uuid.UUID, filter FilterQuery) ([]PostComment, error)
 
 	AddEngagement(ctx context.Context, q database.Querier, e PostEngagement) error
-	SyncPostEngagements(ctx context.Context, q database.Querier, assetType PostType, assetID uuid.UUID) error
 }

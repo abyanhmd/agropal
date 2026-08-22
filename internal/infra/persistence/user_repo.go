@@ -24,15 +24,19 @@ func NewUserRepository(l *pkg.Logger) dUser.Repository {
 }
 
 func (r *userRepo) CreateUser(ctx context.Context, q database.Querier, user dUser.User) error {
+	// updated_at is NOT NULL DEFAULT NOW() on the users table; a fresh user
+	// has no Metadata.UpdatedAt yet (it's nil until the first update), so
+	// it's deliberately left out of the column list here to let the
+	// column default apply instead of binding an explicit NULL.
 	query := `
 		INSERT INTO users (
 			user_id, name, email, username,
 			avatar, password, role,
-			created_at, updated_at, deleted_at, last_login_at
+			created_at, deleted_at, last_login_at
 		) VALUES (
 			:user_id, :name, :email, :username,
-			:avatar, :password, :role, 
-			:created_at, :updated_at, :deleted_at, :last_login_at
+			:avatar, :password, :role,
+			:created_at, :deleted_at, :last_login_at
 		);`
 
 	userModel := ToUserModel(user)
@@ -114,12 +118,13 @@ func (r *userRepo) UpdateUser(ctx context.Context, q database.Querier, user dUse
 		WHERE user_id = :user_id;`
 
 	userModel := ToUserModel(user)
-	if _, err := q.NamedExecContext(ctx, query, userModel); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return dUser.ErrNotFound
-		}
+	result, err := q.NamedExecContext(ctx, query, userModel)
+	if err != nil {
 		r.logger.Error(ctx, shared.AssetUser, err.Error())
 		return err
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return dUser.ErrNotFound
 	}
 
 	return nil
@@ -131,12 +136,13 @@ func (r *userRepo) UpdateUserPassword(ctx context.Context, q database.Querier, u
 			password = $1
 		WHERE user_id = $2;`
 
-	if _, err := q.ExecContext(ctx, updateQuery, password, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return dUser.ErrNotFound
-		}
+	result, err := q.ExecContext(ctx, updateQuery, password, userID)
+	if err != nil {
 		r.logger.Error(ctx, shared.AssetUser, err.Error())
 		return err
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return dUser.ErrNotFound
 	}
 
 	return nil
@@ -145,12 +151,13 @@ func (r *userRepo) UpdateUserPassword(ctx context.Context, q database.Querier, u
 func (r *userRepo) VerifyUserEmail(ctx context.Context, q database.Querier, userID uuid.UUID, verifiedAt time.Time) error {
 	query := `UPDATE users SET email_verified_at = $1 WHERE user_id = $2;`
 
-	if _, err := q.ExecContext(ctx, query, verifiedAt, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return dUser.ErrNotFound
-		}
+	result, err := q.ExecContext(ctx, query, verifiedAt, userID)
+	if err != nil {
 		r.logger.Error(ctx, shared.AssetUser, err.Error())
 		return err
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return dUser.ErrNotFound
 	}
 
 	return nil
@@ -159,12 +166,13 @@ func (r *userRepo) VerifyUserEmail(ctx context.Context, q database.Querier, user
 func (r *userRepo) SoftDeleteUser(ctx context.Context, q database.Querier, userID uuid.UUID, deletedAt time.Time) error {
 	query := `UPDATE users SET deleted_at = $1 WHERE user_id = $2;`
 
-	if _, err := q.ExecContext(ctx, query, deletedAt, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return dUser.ErrNotFound
-		}
+	result, err := q.ExecContext(ctx, query, deletedAt, userID)
+	if err != nil {
 		r.logger.Error(ctx, shared.AssetUser, err.Error())
 		return err
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return dUser.ErrNotFound
 	}
 
 	return nil
@@ -173,12 +181,13 @@ func (r *userRepo) SoftDeleteUser(ctx context.Context, q database.Querier, userI
 func (r *userRepo) DeleteUser(ctx context.Context, q database.Querier, userID uuid.UUID) error {
 	query := `DELETE FROM users WHERE user_id = $1;`
 
-	if _, err := q.ExecContext(ctx, query, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return dUser.ErrNotFound
-		}
+	result, err := q.ExecContext(ctx, query, userID)
+	if err != nil {
 		r.logger.Error(ctx, shared.AssetUser, err.Error())
 		return err
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return dUser.ErrNotFound
 	}
 
 	return nil
@@ -195,20 +204,20 @@ func (r *userRepo) ListUsersByAsset(ctx context.Context, q database.Querier, ass
 	}
 
 	var modelUsers []UserModel
-	var domainUsers []dUser.User
 
 	if assetID != uuid.Nil {
-		if errQuery := q.GetContext(ctx, &modelUsers, getQuery, assetID); errQuery != nil {
+		if errQuery := q.SelectContext(ctx, &modelUsers, getQuery, assetID); errQuery != nil {
 			r.logger.Error(ctx, shared.AssetUser, errQuery.Error())
-			return domainUsers, errQuery
+			return nil, errQuery
 		}
 	} else {
 		if errQuery := q.SelectContext(ctx, &modelUsers, getQuery); errQuery != nil {
 			r.logger.Error(ctx, shared.AssetUser, errQuery.Error())
-			return domainUsers, errQuery
+			return nil, errQuery
 		}
 	}
 
+	domainUsers := make([]dUser.User, len(modelUsers))
 	for i, modelUser := range modelUsers {
 		domainUsers[i] = modelUser.ToDomain()
 	}

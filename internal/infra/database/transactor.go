@@ -19,15 +19,25 @@ type Querier interface {
 	Rebind(query string) string
 }
 
-type Transactor struct {
+// Transactor gives app-layer services a Querier for one-off calls (DB) or a
+// transactional scope (WithTx), without depending on *sqlx.DB directly.
+// Interface rather than concrete type so tests can inject a fake instead of
+// standing up a real database.
+type Transactor interface {
+	DB() Querier
+	WithTx(ctx context.Context, fn func(q Querier) error) error
+}
+
+// SQLTransactor is Transactor backed by a real *sqlx.DB/Postgres connection.
+type SQLTransactor struct {
 	db *sqlx.DB
 }
 
 func NewTransactor(db *sqlx.DB) Transactor {
-	return Transactor{db: db}
+	return &SQLTransactor{db: db}
 }
 
-func (t *Transactor) WithTx(ctx context.Context, fn func(q Querier) error) error {
+func (t *SQLTransactor) WithTx(ctx context.Context, fn func(q Querier) error) error {
 	tx, err := t.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
@@ -50,6 +60,6 @@ func (t *Transactor) WithTx(ctx context.Context, fn func(q Querier) error) error
 	return tx.Commit()
 }
 
-func (t *Transactor) DB() Querier {
+func (t *SQLTransactor) DB() Querier {
 	return t.db
 }

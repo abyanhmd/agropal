@@ -3,19 +3,20 @@ package persistence
 import (
 	"agropal/config"
 	dUser "agropal/internal/domain/user"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 type UserModel struct {
-	ID       uuid.UUID `db:"user_id"`
-	Name     string    `db:"name"`
-	Email    string    `db:"email"`
-	Username string    `db:"username"`
-	Avatar   string    `db:"avatar"`
-	Password string    `db:"password"`
-	Role     string    `db:"role"`
+	ID       uuid.UUID      `db:"user_id"`
+	Name     string         `db:"name"`
+	Email    string         `db:"email"`
+	Username string         `db:"username"`
+	Avatar   sql.NullString `db:"avatar"` // avatar has no NOT NULL constraint
+	Password string         `db:"password"`
+	Role     string         `db:"role"`
 
 	CreatedAt       time.Time  `db:"created_at"`
 	UpdatedAt       *time.Time `db:"updated_at"`
@@ -31,7 +32,7 @@ func ToUserModel(domain dUser.User) UserModel {
 		Name:     domain.Account.Name,
 		Email:    domain.Account.Email,
 		Username: domain.Account.Username,
-		Avatar:   domain.Account.Avatar,
+		Avatar:   sql.NullString{String: domain.Account.Avatar, Valid: domain.Account.Avatar != ""},
 
 		Password: domain.Security.Password,
 		Role:     string(domain.Security.Role),
@@ -51,7 +52,7 @@ func (m UserModel) ToDomain() dUser.User {
 			Name:     m.Name,
 			Email:    m.Email,
 			Username: m.Username,
-			Avatar:   m.Avatar,
+			Avatar:   m.Avatar.String,
 		},
 		Security: dUser.SecurityInfo{
 			Password: m.Password,

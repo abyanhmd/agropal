@@ -20,10 +20,10 @@ func NewWeatherRepository(l *pkg.Logger) dWeather.Repository {
 
 func (r *weatherRepo) CreateWeatherLocation(ctx context.Context, q database.Querier, weather dWeather.Weather) error {
 	query := `
-		INSERT INTO weathers (
-			weather_id, longitude, latitude, farm_id
+		INSERT INTO location_info (
+			location_id, longitude, latitude, farm_id
 		) VALUES (
-			:weather_id, :longitude, :latitude, :farm_id
+			:location_id, :longitude, :latitude, :farm_id
 		);`
 
 	weatherModel := ToWeatherModel(weather)
@@ -36,7 +36,7 @@ func (r *weatherRepo) CreateWeatherLocation(ctx context.Context, q database.Quer
 }
 
 func (r *weatherRepo) GetWeatherLocationByID(ctx context.Context, q database.Querier, id uuid.UUID) (dWeather.Weather, error) {
-	query := `SELECT * FROM weathers WHERE weather_id = $1;`
+	query := `SELECT * FROM location_info WHERE location_id = $1;`
 
 	var weatherModel WeatherModel
 	if err := q.GetContext(ctx, &weatherModel, query, id); err != nil {
@@ -48,7 +48,7 @@ func (r *weatherRepo) GetWeatherLocationByID(ctx context.Context, q database.Que
 }
 
 func (r *weatherRepo) ListWeatherLocationsByFarmID(ctx context.Context, q database.Querier, farmID uuid.UUID) ([]dWeather.Weather, error) {
-	query := `SELECT * FROM weathers WHERE farm_id = $1;`
+	query := `SELECT * FROM location_info WHERE farm_id = $1;`
 
 	var weatherModels []WeatherModel
 	if err := q.SelectContext(ctx, &weatherModels, query, farmID); err != nil {
@@ -66,13 +66,13 @@ func (r *weatherRepo) ListWeatherLocationsByFarmID(ctx context.Context, q databa
 
 func (r *weatherRepo) UpdateWeatherLocation(ctx context.Context, q database.Querier, weather dWeather.Weather) error {
 	query := `
-		UPDATE weathers 
+		UPDATE location_info
 		SET longitude = :longitude,
 			latitude = :latitude
-		WHERE weather_id = :weather_id;`
+		WHERE location_id = :location_id;`
 
 	weatherModel := ToWeatherModel(weather)
-	if _, err := q.ExecContext(ctx, query, weatherModel); err != nil {
+	if _, err := q.NamedExecContext(ctx, query, weatherModel); err != nil {
 		r.logger.Error(ctx, shared.AssetWeather, err.Error())
 		return err
 	}
@@ -81,7 +81,7 @@ func (r *weatherRepo) UpdateWeatherLocation(ctx context.Context, q database.Quer
 }
 
 func (r *weatherRepo) DeleteWeatherLocation(ctx context.Context, q database.Querier, id uuid.UUID) error {
-	query := `DELETE FROM weathers WHERE weather_id = $1;`
+	query := `DELETE FROM location_info WHERE location_id = $1;`
 
 	if _, err := q.ExecContext(ctx, query, id); err != nil {
 		r.logger.Error(ctx, shared.AssetWeather, err.Error())

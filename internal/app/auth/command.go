@@ -32,13 +32,18 @@ type ChangePasswordCommand struct {
 /* ==================== Mapping ====================== */
 
 func (c CreateUserCommand) ToDomain(userID uuid.UUID) dUser.User {
+	var avatar string
+	if c.Avatar != nil {
+		avatar = *c.Avatar
+	}
+
 	return dUser.User{
 		ID: userID,
 		Account: dUser.AccountInfo{
 			Name:     c.Name,
 			Email:    c.Email,
 			Username: c.Username,
-			Avatar:   *c.Avatar,
+			Avatar:   avatar,
 		},
 		Security: dUser.SecurityInfo{
 			Password: c.Password,

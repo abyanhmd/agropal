@@ -19,11 +19,11 @@ func NewAuthRepository(l *pkg.Logger) dAuth.Repository {
 func (r *authRepo) CreateRefreshToken(ctx context.Context, q database.Querier, token dAuth.RefreshToken) error {
 	query := `
 		INSERT INTO refresh_tokens (
-			refresh_token_id, user_id, 
-			token, user_agent, 
+			refresh_token_id, user_id, expires_at,
+			token, user_agent,
 			ip_address
 		) VALUES (
-			:refresh_token_id, :user_id,
+			:refresh_token_id, :user_id, :expires_at,
 			:token, :user_agent,
 			:ip_address
 		);`

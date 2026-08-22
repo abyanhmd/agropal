@@ -32,6 +32,13 @@ type EmailVerificationTask struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
+// Publisher is the narrow slice of RabbitMQ that callers (e.g. aAuth.Service)
+// actually depend on. Interface rather than the concrete type so tests can
+// inject a fake instead of standing up a real broker.
+type Publisher interface {
+	PublishMessage(ctx context.Context, data []byte) error
+}
+
 // RabbitMQ represents a RabbitMQ connection and channel manager
 type RabbitMQ struct {
 	logger     *pkg.Logger

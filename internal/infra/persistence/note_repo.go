@@ -23,12 +23,14 @@ func NewNoteRepository(l *pkg.Logger) dNote.Repository {
 func (r *noteRepo) CreateNote(ctx context.Context, q database.Querier, note dNote.Note) error {
 	query := `
 		INSERT INTO notes (
-			note_id, created_at, type,
-			asset_type, asset_id, field,
+			note_id, created_at, note_type,
+			asset_type, asset_id, update_field,
+			old_value, new_value,
 			author_id, is_system_log
 		) VALUES (
-			:note_id, :created_at, :type,
-			:asset_type, :asset_id, :field,
+			:note_id, :created_at, :note_type,
+			:asset_type, :asset_id, :update_field,
+			:old_value, :new_value,
 			:author_id, :is_system_log
 		);`
 
@@ -42,14 +44,24 @@ func (r *noteRepo) CreateNote(ctx context.Context, q database.Querier, note dNot
 }
 
 func (r *noteRepo) CreateManyNotes(ctx context.Context, q database.Querier, notes []dNote.Note) error {
+	// sqlx's bulk NamedExecContext errors on a zero-length slice; callers
+	// (e.g. product.Service.UpdateProduct when a command changes no
+	// fields) legitimately pass an empty slice, so this is a no-op rather
+	// than an error.
+	if len(notes) == 0 {
+		return nil
+	}
+
 	query := `
 		INSERT INTO notes (
-			note_id, created_at, type,
-			asset_type, asset_id, field,
+			note_id, created_at, note_type,
+			asset_type, asset_id, update_field,
+			old_value, new_value,
 			author_id, is_system_log
 		) VALUES (
-			:note_id, :created_at, :type,
-			:asset_type, :asset_id, :field,
+			:note_id, :created_at, :note_type,
+			:asset_type, :asset_id, :update_field,
+			:old_value, :new_value,
 			:author_id, :is_system_log
 		);`
 
@@ -71,15 +83,15 @@ func (r *noteRepo) ListNotes(ctx context.Context, q database.Querier, noteType d
 	}
 
 	query := `
-		SELECT DISTINCT ON (n.asset_id) 
-			n.note_id, n.created_at, n.type,
-			n.asset_type, n.asset_id, n.field,
-			n.author_id, u.name AS author_name, 
-			n.is_system_log
+		SELECT DISTINCT ON (n.asset_id)
+			n.note_id, n.created_at, n.note_type,
+			n.asset_type, n.asset_id, n.update_field,
+			n.author_id, u.name AS author_name,
+			n.old_value, n.new_value, n.is_system_log
 		FROM notes n
 		JOIN users u ON n.author_id = u.user_id
-		WHERE n.asset_id = $1
-			AND n.type = $2
+		WHERE n.asset_id = ANY($1)
+			AND n.note_type = $2
 		`
 
 	args := []interface{}{pq.Array(assetIDs), string(noteType)}
@@ -88,7 +100,7 @@ func (r *noteRepo) ListNotes(ctx context.Context, q database.Querier, noteType d
 		if len(colValue) == 0 {
 			continue
 		}
-		query += fmt.Sprintf(" AND n.%s = %d", pq.QuoteIdentifier(colName), len(args))
+		query += fmt.Sprintf(" AND n.%s = $%d", pq.QuoteIdentifier(colName), len(args)+1)
 		args = append(args, colValue)
 	}
 

@@ -110,7 +110,7 @@ func (s *Service) CreatePostComment(ctx context.Context, cmd PostCommentCommand)
 	if errGen != nil {
 		return errGen
 	}
-	comment.PostID = commentID
+	comment.ID = commentID
 
 	return s.postRepo.AddComment(ctx, s.transactor.DB(), comment)
 }

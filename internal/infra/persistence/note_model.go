@@ -11,7 +11,7 @@ import (
 type NoteModel struct {
 	ID          uuid.UUID `db:"note_id"`
 	CreatedAt   time.Time `db:"created_at"`
-	Type        string    `db:"type"`
+	Type        string    `db:"note_type"`
 	AssetType   string    `db:"asset_type"`
 	AssetID     uuid.UUID `db:"asset_id"`
 	UpdateField *string   `db:"update_field"`

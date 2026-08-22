@@ -42,12 +42,12 @@ func (s *Service) Create(ctx context.Context, farmID, productID uuid.UUID, cmd [
 		return err
 	}
 
-	transactionID, err := uuid.NewV7()
-	if err != nil {
-		return err
-	}
 	transactions := make([]dTransaction.Transaction, len(cmd))
 	for i, c := range cmd {
+		transactionID, err := uuid.NewV7()
+		if err != nil {
+			return err
+		}
 		transactions[i] = c.ToDomain(productID, transactionID)
 	}
 

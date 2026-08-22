@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type transactionRepo struct {
@@ -21,11 +22,11 @@ func NewTransactionRepository(l *pkg.Logger) dTransaction.Repository {
 func (r *transactionRepo) CreateTransaction(ctx context.Context, q database.Querier, t []dTransaction.Transaction) error {
 	query := `
 		INSERT INTO transactions (
-			transaction_id, date, type,
+			transaction_id, transaction_date, transaction_type,
 			amount, currency, description,
 			product_id
 		) VALUES (
-			:transaction_id, :date, :type,
+			:transaction_id, :transaction_date, :transaction_type,
 			:amount, :currency, :description,
 			:product_id
 		);`
@@ -55,8 +56,14 @@ func (r *transactionRepo) FindTransactionByID(ctx context.Context, q database.Qu
 	return transactionModel.ToDomain(), nil
 }
 
+// ListTransactionsByFarmID joins through products since transactions only
+// reference product_id directly - there is no farm_id column on
+// transactions itself.
 func (r *transactionRepo) ListTransactionsByFarmID(ctx context.Context, q database.Querier, farmID uuid.UUID) ([]dTransaction.Transaction, error) {
-	query := `SELECT * FROM transactions WHERE farm_id = $1;`
+	query := `
+		SELECT t.* FROM transactions t
+		JOIN products p ON p.product_id = t.product_id
+		WHERE p.farm_id = $1;`
 
 	var transactionModels []TransactionModel
 	if err := q.SelectContext(ctx, &transactionModels, query, farmID); err != nil {
@@ -90,13 +97,13 @@ func (r *transactionRepo) ListTransactionsByProductID(ctx context.Context, q dat
 }
 
 func (r *transactionRepo) UpdateTransaction(ctx context.Context, q database.Querier, t dTransaction.Transaction) error {
-	query := `UPDATE transactions 
-		SET date = :date, 
-		    type = :type, 
-		    amount = :amount, 
+	query := `UPDATE transactions
+		SET transaction_date = :transaction_date,
+		    transaction_type = :transaction_type,
+		    amount = :amount,
 		    currency = :currency,
-		    description = :description, 
-		    product_id = :product_id 
+		    description = :description,
+		    product_id = :product_id
 		WHERE transaction_id = :transaction_id;`
 
 	transactionModel := ToTransactionModel(t)
@@ -111,7 +118,7 @@ func (r *transactionRepo) UpdateTransaction(ctx context.Context, q database.Quer
 func (r *transactionRepo) DeleteTransactions(ctx context.Context, q database.Querier, productID uuid.UUID, transactionIDs []uuid.UUID) error {
 	query := `DELETE FROM transactions WHERE product_id = $1 AND transaction_id = ANY($2);`
 
-	if _, err := q.ExecContext(ctx, query, productID, transactionIDs); err != nil {
+	if _, err := q.ExecContext(ctx, query, productID, pq.Array(transactionIDs)); err != nil {
 		r.logger.Error(ctx, shared.AssetTransaction, err.Error())
 		return err
 	}

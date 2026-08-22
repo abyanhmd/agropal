@@ -7,6 +7,7 @@ import (
 	"agropal/internal/request"
 	"agropal/internal/utils"
 	"net/http"
+	"time"
 )
 
 type Handler struct {
@@ -62,12 +63,23 @@ func (h *Handler) VerifyRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.authService.VerifyRegistration(ctx, email, code); err != nil {
+	tokenPair, err := h.authService.VerifyRegistration(ctx, email, code)
+	if err != nil {
 		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
 		return
 	}
 
-	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessEmailVerified, nil)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "rid",
+		Value:    tokenPair.RefreshToken.ID,
+		Expires:  time.Unix(tokenPair.RefreshToken.ExpiresAt, 0),
+		HttpOnly: true,
+		Path:     "/",
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessEmailVerified, tokenPair)
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
@@ -114,6 +126,16 @@ func (h *Handler) VerifyLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	http.SetCookie(w, &http.Cookie{
+		Name:     "rid",
+		Value:    tokenPair.RefreshToken.ID,
+		Expires:  time.Unix(tokenPair.RefreshToken.ExpiresAt, 0),
+		HttpOnly: true,
+		Path:     "/",
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
 	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessLogin, tokenPair)
 }
 
@@ -148,6 +170,16 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
 		return
 	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "rid",
+		Value:    "",
+		Expires:  time.Now().UTC(),
+		HttpOnly: true,
+		Path:     "/",
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
 
 	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessLogout, nil)
 }

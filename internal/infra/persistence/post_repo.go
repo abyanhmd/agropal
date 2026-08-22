@@ -69,8 +69,19 @@ func (r *postRepo) DeletePost(ctx context.Context, q database.Querier, id uuid.U
 	return nil
 }
 
+// postSelectColumns computes like/dislike/view/comment counts per post on
+// read instead of maintaining denormalized counter columns - posts/
+// post_comments store no such columns, so these are always derived from
+// post_engagements and post_comments directly.
+const postSelectColumns = `
+	p.*,
+	(SELECT COUNT(*) FROM post_engagements WHERE asset_type = 'POST' AND asset_id = p.post_id AND type = 'LIKE') AS like_count,
+	(SELECT COUNT(*) FROM post_engagements WHERE asset_type = 'POST' AND asset_id = p.post_id AND type = 'DISLIKE') AS dislike_count,
+	(SELECT COUNT(*) FROM post_engagements WHERE asset_type = 'POST' AND asset_id = p.post_id AND type = 'VIEW') AS view_count,
+	(SELECT COUNT(*) FROM post_comments WHERE post_id = p.post_id AND parent_id IS NULL) AS comment_count`
+
 func (r *postRepo) FindPostByID(ctx context.Context, q database.Querier, id uuid.UUID) (dPost.Post, error) {
-	query := `SELECT * FROM posts WHERE post_id = $1;`
+	query := `SELECT ` + postSelectColumns + ` FROM posts p WHERE p.post_id = $1;`
 
 	var modelPost PostModel
 	if err := q.GetContext(ctx, &modelPost, query, id); err != nil {
@@ -82,7 +93,7 @@ func (r *postRepo) FindPostByID(ctx context.Context, q database.Querier, id uuid
 }
 
 func (r *postRepo) FindPostBySlug(ctx context.Context, q database.Querier, slug string) (dPost.Post, error) {
-	query := `SELECT * FROM posts WHERE slug = $1;`
+	query := `SELECT ` + postSelectColumns + ` FROM posts p WHERE p.slug = $1;`
 
 	var modelPost PostModel
 	if err := q.GetContext(ctx, &modelPost, query, slug); err != nil {
@@ -94,7 +105,7 @@ func (r *postRepo) FindPostBySlug(ctx context.Context, q database.Querier, slug 
 }
 
 func (r *postRepo) ListPosts(ctx context.Context, q database.Querier, filter dPost.FilterQuery) ([]dPost.Post, error) {
-	query := `SELECT * FROM posts`
+	query := `SELECT ` + postSelectColumns + ` FROM posts p`
 	args := []interface{}{}
 
 	var conditions []string
@@ -157,8 +168,18 @@ func (r *postRepo) AddComment(ctx context.Context, q database.Querier, c dPost.P
 	return nil
 }
 
+// commentSelectColumns computes like/dislike/view/reply counts per comment
+// on read instead of maintaining denormalized counter columns -
+// post_comments stores no such columns.
+const commentSelectColumns = `
+	c.*,
+	(SELECT COUNT(*) FROM post_engagements WHERE asset_type = 'COMMENT' AND asset_id = c.comment_id AND type = 'LIKE') AS like_count,
+	(SELECT COUNT(*) FROM post_engagements WHERE asset_type = 'COMMENT' AND asset_id = c.comment_id AND type = 'DISLIKE') AS dislike_count,
+	(SELECT COUNT(*) FROM post_engagements WHERE asset_type = 'COMMENT' AND asset_id = c.comment_id AND type = 'VIEW') AS view_count,
+	(SELECT COUNT(*) FROM post_comments WHERE parent_id = c.comment_id) AS reply_count`
+
 func (r *postRepo) ListTopLevelComments(ctx context.Context, q database.Querier, postID uuid.UUID, filter dPost.FilterQuery) ([]dPost.PostComment, error) {
-	query := `SELECT * FROM post_comments`
+	query := `SELECT ` + commentSelectColumns + ` FROM post_comments c`
 
 	args := []interface{}{postID}
 	condition := []string{
@@ -204,7 +225,7 @@ func (r *postRepo) ListTopLevelComments(ctx context.Context, q database.Querier,
 }
 
 func (r *postRepo) ListCommentReplies(ctx context.Context, q database.Querier, parentID uuid.UUID, filter dPost.FilterQuery) ([]dPost.PostComment, error) {
-	query := `SELECT * FROM post_comments`
+	query := `SELECT ` + commentSelectColumns + ` FROM post_comments c`
 
 	args := []interface{}{parentID}
 	condition := []string{
@@ -263,52 +284,6 @@ func (r *postRepo) AddEngagement(ctx context.Context, q database.Querier, e dPos
 	modelEngagement := ToEngagementModel(e)
 	if _, err := q.NamedExecContext(ctx, query, modelEngagement); err != nil {
 		r.logger.Error(ctx, shared.AssetPost, err.Error())
-		return err
-	}
-
-	return nil
-}
-
-func (r *postRepo) SyncPostEngagements(ctx context.Context, q database.Querier, assetType dPost.PostType, assetID uuid.UUID) error {
-	var tableName, idColumn, extraCountColumn, extraCountQuery string
-	var assetTypeStr shared.AssetType
-
-	switch assetType {
-	case dPost.TypePost:
-		assetTypeStr = shared.AssetPost
-		tableName = "posts"
-		idColumn = "post_id"
-		extraCountColumn = "comment_count"
-		extraCountQuery = "(SELECT COUNT(*) FROM post_comments WHERE post_id = $1 AND parent_id IS NULL)"
-	case dPost.TypeComment:
-		assetTypeStr = shared.AssetComment
-		tableName = "post_comments"
-		idColumn = "comment_id"
-		extraCountColumn = "reply_count"
-		extraCountQuery = "(SELECT COUNT(*) FROM post_comments WHERE parent_id = $1)"
-	default:
-		return dPost.ErrInvalidAssetType
-	}
-
-	query := fmt.Sprintf(`
-        WITH engagement_stats AS (
-            SELECT 
-                COUNT(*) FILTER (WHERE type = 'LIKE') as likes,
-                COUNT(*) FILTER (WHERE type = 'DISLIKE') as dislikes,
-                COUNT(*) FILTER (WHERE type = 'VIEW') as views
-            FROM post_engagements 
-            WHERE asset_type = $2 AND asset_id = $1
-        )
-        UPDATE %s SET 
-            like_count = stats.likes,
-            dislike_count = stats.dislikes,
-            view_count = stats.views,
-            %s = %s
-        FROM engagement_stats stats
-        WHERE %s = $1`, tableName, extraCountColumn, extraCountQuery, idColumn)
-
-	if _, err := q.ExecContext(ctx, query, assetID, assetType); err != nil {
-		r.logger.Error(ctx, assetTypeStr, err.Error())
 		return err
 	}
 

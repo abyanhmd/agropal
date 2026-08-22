@@ -91,24 +91,24 @@ func (r *productRepo) FindProductDetailByID(ctx context.Context, q database.Quer
 		return dProduct.ProductDetail{}, err
 	}
 
-	var stocks []dProduct.ProductStock
 	var stockModels []ProductStockModel
 	if err := q.SelectContext(ctx, &stockModels, stockQuery, id); err != nil {
 		r.logger.Error(ctx, shared.AssetProduct, err.Error())
 		return dProduct.ProductDetail{}, err
 	}
 
-	var prices []dProduct.ProductPrice
 	var priceModels []ProductPriceModel
 	if err := q.SelectContext(ctx, &priceModels, priceQuery, id); err != nil {
 		r.logger.Error(ctx, shared.AssetProduct, err.Error())
 		return dProduct.ProductDetail{}, err
 	}
 
+	prices := make([]dProduct.ProductPrice, len(priceModels))
 	for i, m := range priceModels {
 		prices[i] = m.ToDomain()
 	}
 
+	stocks := make([]dProduct.ProductStock, len(stockModels))
 	for i, m := range stockModels {
 		stocks[i] = m.ToDomain()
 	}
@@ -176,11 +176,11 @@ func (r *productRepo) AddProductStock(ctx context.Context, q database.Querier, s
 	query := `
 		INSERT INTO product_stocks (
 			stock_id, product_id,
-			created_at, type,
+			created_at, stock_type,
 			quantity
 		) VALUES (
-			:stock_id, :product_id, 
-			:created_at, :type, 
+			:stock_id, :product_id,
+			:created_at, :stock_type,
 		  	:quantity
 		);`
 

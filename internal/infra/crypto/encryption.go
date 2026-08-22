@@ -10,8 +10,11 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"io"
 )
+
+var ErrCipherTextTooShort = errors.New("crypto: ciphertext too short to contain nonce")
 
 type Encryption struct {
 	logger *pkg.Logger
@@ -85,6 +88,11 @@ func (e *Encryption) DecryptAES(ctx context.Context, encType EncryptionType, tex
 	if errAes != nil {
 		e.logger.Error(ctx, shared.System, errAes.Error())
 		return "", errAes
+	}
+
+	if len(data) < 12 {
+		e.logger.Error(ctx, shared.System, ErrCipherTextTooShort.Error())
+		return "", ErrCipherTextTooShort
 	}
 
 	nonce, cipherText := data[:12], data[12:]

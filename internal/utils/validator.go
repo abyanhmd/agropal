@@ -19,17 +19,29 @@ func ValidPassword(password string) error {
 		return dAuth.ErrPasswordTooLong
 	}
 
+	var hasLower, hasUpper, hasNumber, hasSpecial bool
 	for _, c := range password {
 		switch {
 		case 'a' <= c && c <= 'z':
-			return dAuth.ErrPasswordHasNoLower
+			hasLower = true
 		case 'A' <= c && c <= 'Z':
-			return dAuth.ErrPasswordHasNoUpper
+			hasUpper = true
 		case '0' <= c && c <= '9':
-			return dAuth.ErrPasswordHasNoNumber
+			hasNumber = true
 		case strings.ContainsRune("@$!%*?&", c):
-			return dAuth.ErrPasswordHasNoSpecial
+			hasSpecial = true
 		}
+	}
+
+	switch {
+	case !hasLower:
+		return dAuth.ErrPasswordHasNoLower
+	case !hasUpper:
+		return dAuth.ErrPasswordHasNoUpper
+	case !hasNumber:
+		return dAuth.ErrPasswordHasNoNumber
+	case !hasSpecial:
+		return dAuth.ErrPasswordHasNoSpecial
 	}
 
 	return nil

@@ -9,8 +9,8 @@ import (
 
 type TransactionModel struct {
 	ID          uuid.UUID `db:"transaction_id"`
-	Date        time.Time `db:"date"`
-	Type        string    `db:"type"`
+	Date        time.Time `db:"transaction_date"`
+	Type        string    `db:"transaction_type"`
 	Amount      float64   `db:"amount"`
 	Currency    string    `db:"currency"`
 	Description string    `db:"description"`

@@ -50,7 +50,7 @@ type Service struct {
 	generator  *identity.Generator
 	jwt        dAuth.TokenProvider
 	redis      *redis.Client
-	queue      *queue.RabbitMQ
+	queue      queue.Publisher
 	authRepo   dAuth.Repository
 	userRepo   dUser.Repository
 }
@@ -61,7 +61,7 @@ func NewService(
 	g *identity.Generator,
 	jwt dAuth.TokenProvider,
 	redis *redis.Client,
-	mq *queue.RabbitMQ,
+	mq queue.Publisher,
 	ar dAuth.Repository,
 	ur dUser.Repository,
 ) *Service {
@@ -229,26 +229,53 @@ func (s *Service) Register(ctx context.Context, cmd CreateUserCommand) error {
 	}
 	user := cmd.ToDomain(userID)
 
+	// Send the verification code before creating the account: if this fails,
+	// nothing was persisted and the caller can just retry. Creating the user
+	// first would risk a stuck unverified account with no code ever sent if
+	// this step failed afterward.
+	if err = s.SendVerificationCode(ctx, verificationPurposeRegister, cmd.Email); err != nil {
+		return err
+	}
+
 	if err = s.userRepo.CreateUser(ctx, s.transactor.DB(), user); err != nil {
 		return err
 	}
 
-	return s.SendVerificationCode(ctx, verificationPurposeRegister, cmd.Email)
+	return nil
 }
 
 // VerifyRegistration confirms a pending registration's code and marks the
 // account's email as verified, unblocking Login.
-func (s *Service) VerifyRegistration(ctx context.Context, email, code string) error {
+func (s *Service) VerifyRegistration(ctx context.Context, email, code string) (dAuth.TokenPair, error) {
 	if err := s.VerifyCode(ctx, verificationPurposeRegister, email, code); err != nil {
-		return err
+		return dAuth.TokenPair{}, err
 	}
 
 	user, err := s.userRepo.FindUserByEmail(ctx, s.transactor.DB(), email)
 	if err != nil {
-		return err
+		return dAuth.TokenPair{}, err
 	}
 
-	return s.userRepo.VerifyUserEmail(ctx, s.transactor.DB(), user.ID, time.Now().UTC())
+	if err = s.userRepo.VerifyUserEmail(ctx, s.transactor.DB(), user.ID, time.Now().UTC()); err != nil {
+		return dAuth.TokenPair{}, err
+	}
+
+	claims := shared.ClaimInfo{
+		UserID: user.ID,
+		Email:  user.Account.Email,
+		Role:   string(user.Security.Role),
+	}
+
+	tokenPair, err := s.jwt.GenerateTokenPair(ctx, claims)
+	if err != nil {
+		return dAuth.TokenPair{}, err
+	}
+
+	if err = s.authRepo.CreateRefreshToken(ctx, s.transactor.DB(), tokenPair.RefreshToken); err != nil {
+		return dAuth.TokenPair{}, err
+	}
+
+	return tokenPair, nil
 }
 
 // Login validates the account's credentials and, on success, emails a

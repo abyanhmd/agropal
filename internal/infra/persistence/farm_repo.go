@@ -63,7 +63,7 @@ func (r *farmRepo) UpdateFarm(ctx context.Context, q database.Querier, farm dFar
 	query := `UPDATE farms SET name = :name WHERE farm_id = :farm_id;`
 
 	farmModel := ToFarmModel(farm)
-	if _, err := q.ExecContext(ctx, query, farmModel); err != nil {
+	if _, err := q.NamedExecContext(ctx, query, farmModel); err != nil {
 		r.logger.Error(ctx, shared.AssetFarm, err.Error())
 		return err
 	}
