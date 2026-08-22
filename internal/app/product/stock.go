@@ -1,8 +1,8 @@
 package product
 
 import (
+	dProduct "agropal/internal/domain/product"
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,7 +16,7 @@ func (s *Service) CreateProductStock(ctx context.Context, farmID, productID uuid
 		return errGet
 	}
 	if product.FarmID != farmID {
-		return errors.New("product id and  farm id does not match")
+		return dProduct.ErrInvalidFarmID
 	}
 
 	stockID, errGen := uuid.NewV7()
@@ -27,10 +27,10 @@ func (s *Service) CreateProductStock(ctx context.Context, farmID, productID uuid
 	stock := cmd.ToDomain(productID, stockID)
 
 	if stock.Stock <= 0 {
-		return errors.New("stock cannot be zero or negative")
+		return dProduct.ErrInvalidStockAmount
 	}
 	if stock.DateAdded.After(nowUTC) {
-		return errors.New("date added cannot be in the future")
+		return dProduct.ErrInvalidDate
 	}
 
 	return s.productRepo.AddProductStock(ctx, s.transactor.DB(), stock)

@@ -2,7 +2,6 @@ package shared
 
 import (
 	"context"
-	"errors"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -55,12 +54,12 @@ func SaveContextFromRequest(r *http.Request, claims *ClaimInfo) context.Context 
 func ExtractUserID(ctx context.Context) (uuid.UUID, error) {
 	userIDStr := GetMetadata(ctx, KeyUserID)
 	if userIDStr == "" {
-		return uuid.Nil, errors.New("invalid user id")
+		return uuid.Nil, ErrUnauthorized
 	}
 
 	userID, errParse := uuid.Parse(userIDStr)
 	if errParse != nil {
-		return uuid.Nil, errors.New("invalid user id")
+		return uuid.Nil, ErrUnauthorized
 	}
 
 	return userID, nil

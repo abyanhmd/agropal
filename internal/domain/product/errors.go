@@ -27,4 +27,6 @@ var (
 	ErrInvalidPriceAmount  shared.ErrorKey = "PRODUCT.INVALID_PRICE_AMOUNT"
 	ErrInsufficientStock   shared.ErrorKey = "PRODUCT.INSUFFICIENT_STOCK"
 	ErrInvalidMovementType shared.ErrorKey = "PRODUCT.INVALID_MOVEMENT_TYPE"
+
+	ErrInvalidDate shared.ErrorKey = "PRODUCT.INVALID_DATE"
 )

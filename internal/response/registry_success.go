@@ -17,10 +17,14 @@ var SuccessRegistry = map[shared.SuccessKey]ResponseDetail{
 	shared.SuccessFileExported: {HTTPCode: 200, Message: "The file was exported successfully."}, // "COMMON.FILE_EXPORTED"
 
 	// AUTH
-	dAuth.SuccessRegister: {HTTPCode: 201, Message: "Registration successful."},      // "AUTH.REGISTER_SUCCESS"
-	dAuth.SuccessLogin:    {HTTPCode: 200, Message: "Login successful."},             // "AUTH.LOGIN_SUCCESS"
-	dAuth.SuccessLogout:   {HTTPCode: 200, Message: "Logout successful."},            // "AUTH.LOGOUT_SUCCESS"
-	dAuth.SuccessRefresh:  {HTTPCode: 200, Message: "Token refreshed successfully."}, // "AUTH.REFRESH_SUCCESS"
+	dAuth.SuccessRegister:           {HTTPCode: 201, Message: "Registration successful."},             // "AUTH.REGISTER_SUCCESS"
+	dAuth.SuccessLogin:              {HTTPCode: 200, Message: "Login successful."},                    // "AUTH.LOGIN_SUCCESS"
+	dAuth.SuccessLogout:             {HTTPCode: 200, Message: "Logout successful."},                   // "AUTH.LOGOUT_SUCCESS"
+	dAuth.SuccessRefresh:            {HTTPCode: 200, Message: "Token refreshed successfully."},        // "AUTH.REFRESH_SUCCESS"
+	dAuth.SuccessVerificationSent:   {HTTPCode: 200, Message: "A verification code has been sent."},   // "AUTH.VERIFICATION_CODE_SENT"
+	dAuth.SuccessEmailVerified:      {HTTPCode: 200, Message: "Email verified successfully."},         // "AUTH.EMAIL_VERIFIED"
+	dAuth.SuccessPasswordResetEmail: {HTTPCode: 200, Message: "A password reset code has been sent."}, // "AUTH.PASSWORD_RESET_EMAIL_SENT"
+	dAuth.SuccessPasswordReset:      {HTTPCode: 200, Message: "Password reset successfully."},         // "AUTH.PASSWORD_RESET_SUCCESS"
 
 	// FARM
 	dFarm.SuccessCreated: {HTTPCode: 201, Message: "The farm was created successfully."}, // "FARM.CREATE_SUCCESS"

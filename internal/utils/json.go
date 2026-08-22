@@ -75,8 +75,7 @@ func (io *IOHandler) WriteResponseBody(w http.ResponseWriter, statusCode int, re
 func (io *IOHandler) WriteSuccess(ctx context.Context, w http.ResponseWriter, key shared.SuccessKey, data any) {
 	detail, ok := response.SuccessRegistry[key]
 	if !ok {
-		//io.handleMissingKey(ctx, w, key, data)
-		return
+		detail = response.ResponseDetail{ResCode: "OK", HTTPCode: 200, Message: "Success."}
 	}
 
 	io.respond(ctx, w, detail.HTTPCode, StandardEnvelope{
@@ -149,6 +148,7 @@ func (io *IOHandler) HandleServiceError(ctx context.Context, w http.ResponseWrit
 
 	detail, ok := response.ErrorRegistry[shared.ErrorKey(key.Error())]
 	if !ok {
+		detail = response.ResponseDetail{ResCode: "1002", HTTPCode: 500, Message: "An unexpected error occurred. Please try again later."}
 		envelope = StandardEnvelope{
 			Info: InfoEnvelope{
 				Code:    "1002",

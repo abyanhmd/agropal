@@ -1,8 +1,8 @@
 package product
 
 import (
+	dProduct "agropal/internal/domain/product"
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,7 +17,7 @@ func (s *Service) CreateProductPrice(ctx context.Context, farmID, productID uuid
 		return errGet
 	}
 	if product.FarmID != farmID {
-		return errors.New("product id and  farm id does not match")
+		return dProduct.ErrInvalidFarmID
 	}
 
 	priceID, errGen := uuid.NewV7()
@@ -27,10 +27,10 @@ func (s *Service) CreateProductPrice(ctx context.Context, farmID, productID uuid
 	price := cmd.ToDomain(productID, priceID)
 
 	if price.Price <= 0 {
-		return errors.New("price cannot be zero or negative")
+		return dProduct.ErrInvalidPriceAmount
 	}
 	if price.DateAdded.After(nowUTC) {
-		return errors.New("date added cannot be in the future")
+		return dProduct.ErrInvalidDate
 	}
 
 	return s.productRepo.AddProductPrice(ctx, db, price)
