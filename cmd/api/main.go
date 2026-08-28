@@ -81,6 +81,7 @@ func main() {
 	authHandler := interfaceAuth.NewHandler(ioHandler, container.Auth.Service)
 	mux.Handle("POST /api/v1/auth/register", publicStack(http.HandlerFunc(authHandler.Register)))
 	mux.Handle("POST /api/v1/auth/register/verify", publicStack(http.HandlerFunc(authHandler.VerifyRegister)))
+	mux.Handle("POST /api/v1/auth/{purpose}/resend-code", publicStack(http.HandlerFunc(authHandler.ResendVerificationCode)))
 	mux.Handle("POST /api/v1/auth/login", publicStack(http.HandlerFunc(authHandler.Login)))
 	mux.Handle("POST /api/v1/auth/login/verify", publicStack(http.HandlerFunc(authHandler.VerifyLogin)))
 	mux.Handle("POST /api/v1/auth/refresh", publicStack(http.HandlerFunc(authHandler.Refresh)))

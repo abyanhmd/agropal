@@ -3,6 +3,7 @@ package auth
 import (
 	aAuth "agropal/internal/app/auth"
 	dAuth "agropal/internal/domain/auth"
+	"agropal/internal/domain/shared"
 	"agropal/internal/request"
 	"agropal/internal/utils"
 )
@@ -72,6 +73,29 @@ func ToVerification(req request.VerificationRequest) (email, code string, err er
 	}
 
 	return *req.Email, *req.Code, nil
+}
+
+// ToResendVerification validates the email/purpose pair for the
+// {purpose}/resend-code endpoint. `login` is deliberately not a resendable
+// purpose here: unlike Login, this endpoint has no password check in front
+// of it, so allowing purpose=login would let anyone trigger a login OTP
+// email for any address with no credentials at all. A stuck login should
+// just call Login again, which resends under the same cooldown.
+func ToResendVerification(req request.ResendVerificationRequest, purposeStr string) (email string, purpose aAuth.VerificationPurpose, err error) {
+	if req.Email == nil || !utils.ValidEmail(*req.Email) {
+		return "", "", dAuth.ErrInvalidEmail
+	}
+
+	switch purposeStr {
+	case string(aAuth.VerificationPurposeRegister):
+		purpose = aAuth.VerificationPurposeRegister
+	case string(aAuth.VerificationPurposeResetPassword):
+		purpose = aAuth.VerificationPurposeResetPassword
+	default:
+		return "", "", shared.ErrInvalidRequest
+	}
+
+	return *req.Email, purpose, nil
 }
 
 // ToPasswordResetEmail validates the email for the reset-password/request

@@ -740,3 +740,85 @@ func TestHandler_ConfirmPasswordReset(t *testing.T) {
 		}
 	})
 }
+
+/* ==================== Tests: ResendVerificationCode ====================== */
+
+func TestHandler_ResendVerificationCode(t *testing.T) {
+	t.Run("Success For Register Purpose", func(t *testing.T) {
+		h := newTestHandler(t, &fakeUserRepository{}, &fakeAuthRepository{}, nil, &fakeTokenProvider{})
+
+		req := jsonRequest(http.MethodPost, "/auth/register/resend-code", `{"email":"jane@example.com"}`)
+		req.SetPathValue("purpose", "register")
+		rec := httptest.NewRecorder()
+
+		h.ResendVerificationCode(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusOK, rec.Body.String())
+		}
+		envelope := decodeEnvelope(t, rec)
+		if envelope.Info.Key != dAuth.SuccessVerificationSent.String() {
+			t.Errorf("Info.Key = %q, want %q", envelope.Info.Key, dAuth.SuccessVerificationSent.String())
+		}
+	})
+
+	t.Run("Success For Reset Password Purpose", func(t *testing.T) {
+		h := newTestHandler(t, &fakeUserRepository{}, &fakeAuthRepository{}, nil, &fakeTokenProvider{})
+
+		req := jsonRequest(http.MethodPost, "/auth/reset_password/resend-code", `{"email":"jane@example.com"}`)
+		req.SetPathValue("purpose", "reset_password")
+		rec := httptest.NewRecorder()
+
+		h.ResendVerificationCode(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusOK, rec.Body.String())
+		}
+	})
+
+	// Unlike Login, this endpoint has no password check in front of it, so
+	// a login code must not be resendable through it - that would let
+	// anyone trigger a login OTP email for any address with no
+	// credentials, bypassing the two-factor design.
+	t.Run("Rejects Login Purpose", func(t *testing.T) {
+		h := newTestHandler(t, &fakeUserRepository{}, &fakeAuthRepository{}, nil, &fakeTokenProvider{})
+
+		req := jsonRequest(http.MethodPost, "/auth/login/resend-code", `{"email":"jane@example.com"}`)
+		req.SetPathValue("purpose", "login")
+		rec := httptest.NewRecorder()
+
+		h.ResendVerificationCode(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusBadRequest, rec.Body.String())
+		}
+	})
+
+	t.Run("Invalid Email Fails Mapping", func(t *testing.T) {
+		h := newTestHandler(t, &fakeUserRepository{}, &fakeAuthRepository{}, nil, &fakeTokenProvider{})
+
+		req := jsonRequest(http.MethodPost, "/auth/register/resend-code", `{"email":"not-an-email"}`)
+		req.SetPathValue("purpose", "register")
+		rec := httptest.NewRecorder()
+
+		h.ResendVerificationCode(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusBadRequest, rec.Body.String())
+		}
+	})
+
+	t.Run("Unknown Purpose Rejected", func(t *testing.T) {
+		h := newTestHandler(t, &fakeUserRepository{}, &fakeAuthRepository{}, nil, &fakeTokenProvider{})
+
+		req := jsonRequest(http.MethodPost, "/auth/bogus/resend-code", `{"email":"jane@example.com"}`)
+		req.SetPathValue("purpose", "bogus")
+		rec := httptest.NewRecorder()
+
+		h.ResendVerificationCode(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusBadRequest, rec.Body.String())
+		}
+	})
+}

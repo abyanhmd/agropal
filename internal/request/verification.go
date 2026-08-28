@@ -12,6 +12,11 @@ type PasswordResetRequest struct {
 	Email *string `json:"email"`
 }
 
+// ResendVerificationRequest backs the {purpose}/resend-code endpoint.
+type ResendVerificationRequest struct {
+	Email *string `json:"email"`
+}
+
 // PasswordResetConfirmRequest backs the reset-password/confirm endpoint.
 type PasswordResetConfirmRequest struct {
 	Email       *string `json:"email"`

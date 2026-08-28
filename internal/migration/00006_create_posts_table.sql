@@ -28,7 +28,20 @@ CREATE TABLE IF NOT EXISTS post_engagements(
 	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts (user_id);
+CREATE INDEX IF NOT EXISTS idx_post_comments_post_id ON post_comments (post_id);
+CREATE INDEX IF NOT EXISTS idx_post_comments_parent_id ON post_comments (parent_id);
+CREATE INDEX IF NOT EXISTS idx_post_engagements_asset ON post_engagements (asset_type, asset_id);
+
 -- +goose Down
+DROP INDEX IF EXISTS idx_post_engagements_asset;
+
+DROP INDEX IF EXISTS idx_post_comments_parent_id;
+
+DROP INDEX IF EXISTS idx_post_comments_post_id;
+
+DROP INDEX IF EXISTS idx_posts_user_id;
+
 DROP TABLE IF EXISTS post_engagements;
 
 DROP TABLE IF EXISTS post_comments;

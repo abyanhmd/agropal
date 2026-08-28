@@ -9,5 +9,9 @@ CREATE TABLE IF NOT EXISTS transactions (
     product_id UUID REFERENCES products(product_id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_transactions_product_id ON transactions (product_id);
+
 -- +goose Down
+DROP INDEX IF EXISTS idx_transactions_product_id;
+
 DROP TABLE IF EXISTS transactions;

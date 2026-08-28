@@ -29,12 +29,12 @@ const (
 	verificationMaxAttempts    = 5
 )
 
-type verificationPurpose string
+type VerificationPurpose string
 
 const (
-	verificationPurposeRegister      verificationPurpose = "register"
-	verificationPurposeLogin         verificationPurpose = "login"
-	verificationPurposeResetPassword verificationPurpose = "reset_password"
+	VerificationPurposeRegister      VerificationPurpose = "register"
+	VerificationPurposeLogin         VerificationPurpose = "login"
+	VerificationPurposeResetPassword VerificationPurpose = "reset_password"
 )
 
 type verificationStatus string
@@ -94,7 +94,7 @@ func hashVerificationCode(code string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (s *Service) SendVerificationCode(ctx context.Context, purpose verificationPurpose, email string) error {
+func (s *Service) SendVerificationCode(ctx context.Context, purpose VerificationPurpose, email string) error {
 	redisKey := fmt.Sprintf("%s:%s", string(purpose), email)
 
 	// Refuse to reissue a code while a recent one is still fresh, so a caller
@@ -146,31 +146,38 @@ func (s *Service) SendVerificationCode(ctx context.Context, purpose verification
 	return nil
 }
 
-func (s *Service) VerifyCode(ctx context.Context, purpose verificationPurpose, email, token string) error {
+// checkCode validates purpose/email/token against Redis without marking the
+// code consumed. Most callers should use VerifyCode instead; checkCode
+// exists for a caller (VerifyRegistration) that still has downstream work
+// to do after a correct code, and needs to be able to retry that work with
+// the same code if it fails, instead of burning the code on a guess that
+// was actually right. A wrong guess still counts against
+// verificationMaxAttempts either way.
+func (s *Service) checkCode(ctx context.Context, purpose VerificationPurpose, email, token string) (verificationRecord, string, error) {
 	redisKey := fmt.Sprintf("%s:%s", string(purpose), email)
 	redisValue, err := s.redis.Get(ctx, redisKey).Result()
 	if errors.Is(err, redis.Nil) {
-		return dAuth.ErrVerificationCodeNotFound
+		return verificationRecord{}, "", dAuth.ErrVerificationCodeNotFound
 	} else if err != nil {
 		s.logger.Error(ctx, shared.System, fmt.Sprintf("redis key(%s) - error: %s", redisKey, err.Error()))
-		return dAuth.ErrVerificationCodeNotFound
+		return verificationRecord{}, "", dAuth.ErrVerificationCodeNotFound
 	}
 
 	var record verificationRecord
 	if err = json.Unmarshal([]byte(redisValue), &record); err != nil {
-		return dAuth.ErrVerificationCodeInvalid
+		return verificationRecord{}, "", dAuth.ErrVerificationCodeInvalid
 	}
 
 	if record.Status == verificationStatusVerified {
-		return dAuth.ErrVerificationCodeUsed
+		return verificationRecord{}, "", dAuth.ErrVerificationCodeUsed
 	}
 	if time.Now().UTC().After(record.ExpiresAt) {
 		_ = s.redis.Del(ctx, redisKey).Err()
-		return dAuth.ErrVerificationCodeExpired
+		return verificationRecord{}, "", dAuth.ErrVerificationCodeExpired
 	}
 	if record.Attempts >= verificationMaxAttempts {
 		_ = s.redis.Del(ctx, redisKey).Err()
-		return dAuth.ErrTooManyAttempts
+		return verificationRecord{}, "", dAuth.ErrTooManyAttempts
 	}
 
 	// Constant-time comparison of the hashes avoids leaking how many
@@ -184,9 +191,15 @@ func (s *Service) VerifyCode(ctx context.Context, purpose verificationPurpose, e
 				_ = s.redis.Set(ctx, redisKey, payload, ttl).Err()
 			}
 		}
-		return dAuth.ErrVerificationCodeInvalid
+		return verificationRecord{}, "", dAuth.ErrVerificationCodeInvalid
 	}
 
+	return record, redisKey, nil
+}
+
+// markCodeVerified flips a checked-out record to verified so it can't be
+// replayed, preserving its remaining TTL.
+func (s *Service) markCodeVerified(ctx context.Context, redisKey string, record verificationRecord) error {
 	record.Status = verificationStatusVerified
 	payload, err := json.Marshal(record)
 	if err != nil {
@@ -196,18 +209,31 @@ func (s *Service) VerifyCode(ctx context.Context, purpose verificationPurpose, e
 	if ttl <= 0 {
 		ttl = time.Second
 	}
-	if err = s.redis.Set(ctx, redisKey, payload, ttl).Err(); err != nil {
+	return s.redis.Set(ctx, redisKey, payload, ttl).Err()
+}
+
+func (s *Service) VerifyCode(ctx context.Context, purpose VerificationPurpose, email, token string) error {
+	record, redisKey, err := s.checkCode(ctx, purpose, email, token)
+	if err != nil {
 		return err
 	}
-
-	return nil
+	return s.markCodeVerified(ctx, redisKey, record)
 }
 
 /* ==================== Identity ====================== */
 
-// Register creates the account in an unverified state and emails a
-// verification code; the account cannot log in until VerifyRegistration
-// confirms it.
+// registerPendingKey namespaces the Redis key holding a not-yet-created
+// account's data while it waits on VerifyRegistration, so it can't collide
+// with any other feature that happens to key Redis by a bare email address.
+func registerPendingKey(email string) string {
+	return fmt.Sprintf("register:pending:%s", email)
+}
+
+// Register stages the account (password hashed, not yet persisted) in
+// Redis and emails a verification code; VerifyRegistration only creates the
+// row in Postgres once that code is confirmed, so no unverified account
+// ever sits in the database. If SendVerificationCode fails, nothing beyond
+// the staged Redis entry exists yet and the caller can just retry.
 func (s *Service) Register(ctx context.Context, cmd CreateUserCommand) error {
 	exists, err := s.userRepo.FindUserByEmail(ctx, s.transactor.DB(), cmd.Email)
 	if err != nil {
@@ -229,36 +255,61 @@ func (s *Service) Register(ctx context.Context, cmd CreateUserCommand) error {
 	}
 	user := cmd.ToDomain(userID)
 
-	// Send the verification code before creating the account: if this fails,
-	// nothing was persisted and the caller can just retry. Creating the user
-	// first would risk a stuck unverified account with no code ever sent if
-	// this step failed afterward.
-	if err = s.SendVerificationCode(ctx, verificationPurposeRegister, cmd.Email); err != nil {
+	payloadJSON, err := json.Marshal(user)
+	if err != nil {
+		return err
+	}
+	if err = s.redis.Set(ctx, registerPendingKey(cmd.Email), payloadJSON, verificationCodeTTL).Err(); err != nil {
 		return err
 	}
 
-	if err = s.userRepo.CreateUser(ctx, s.transactor.DB(), user); err != nil {
+	if err = s.SendVerificationCode(ctx, VerificationPurposeRegister, cmd.Email); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// VerifyRegistration confirms a pending registration's code and marks the
-// account's email as verified, unblocking Login.
+// VerifyRegistration confirms a pending registration's code and creates the
+// account, already marked verified. The code is checked but deliberately
+// not consumed until CreateUser succeeds: if account creation fails (DB
+// down, or a losing race against another registration for the same
+// email/username), the code is still valid and the caller can retry
+// VerifyRegistration without going back through Register for a new one.
 func (s *Service) VerifyRegistration(ctx context.Context, email, code string) (dAuth.TokenPair, error) {
-	if err := s.VerifyCode(ctx, verificationPurposeRegister, email, code); err != nil {
+	record, redisKey, err := s.checkCode(ctx, VerificationPurposeRegister, email, code)
+	if err != nil {
 		return dAuth.TokenPair{}, err
 	}
 
-	user, err := s.userRepo.FindUserByEmail(ctx, s.transactor.DB(), email)
+	pendingKey := registerPendingKey(email)
+	userBytes, err := s.redis.Get(ctx, pendingKey).Bytes()
 	if err != nil {
+		return dAuth.TokenPair{}, err
+	}
+	var user dUser.User
+	if err = json.Unmarshal(userBytes, &user); err != nil {
+		return dAuth.TokenPair{}, err
+	}
+
+	if err = s.userRepo.CreateUser(ctx, s.transactor.DB(), user); err != nil {
 		return dAuth.TokenPair{}, err
 	}
 
 	if err = s.userRepo.VerifyUserEmail(ctx, s.transactor.DB(), user.ID, time.Now().UTC()); err != nil {
 		return dAuth.TokenPair{}, err
 	}
+
+	// The account now exists (and is verified) in Postgres, which is what
+	// actually stops this code from being replayed into a second account -
+	// a second CreateUser attempt fails on the unique email/username
+	// indexes. Marking the code used and dropping the staged payload here
+	// is best-effort cleanup, not load-bearing, so a failure doesn't block
+	// the response.
+	if err := s.markCodeVerified(ctx, redisKey, record); err != nil {
+		s.logger.Error(ctx, shared.System, fmt.Sprintf("failed to mark registration code used for %s: %s", email, err.Error()))
+	}
+	_ = s.redis.Del(ctx, pendingKey).Err()
 
 	claims := shared.ClaimInfo{
 		UserID: user.ID,
@@ -310,13 +361,13 @@ func (s *Service) Login(ctx context.Context, cmd LoginUserCommand) error {
 		return dAuth.ErrEmailNotVerified
 	}
 
-	return s.SendVerificationCode(ctx, verificationPurposeLogin, user.Account.Email)
+	return s.SendVerificationCode(ctx, VerificationPurposeLogin, user.Account.Email)
 }
 
 // VerifyLogin confirms the one-time code from Login and, if valid, issues
 // the token pair.
 func (s *Service) VerifyLogin(ctx context.Context, email, code string) (dAuth.TokenPair, error) {
-	if err := s.VerifyCode(ctx, verificationPurposeLogin, email, code); err != nil {
+	if err := s.VerifyCode(ctx, VerificationPurposeLogin, email, code); err != nil {
 		return dAuth.TokenPair{}, err
 	}
 
@@ -436,13 +487,13 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email string) error 
 		return err
 	}
 
-	return s.SendVerificationCode(ctx, verificationPurposeResetPassword, email)
+	return s.SendVerificationCode(ctx, VerificationPurposeResetPassword, email)
 }
 
 // ConfirmPasswordReset verifies the one-time code from RequestPasswordReset
 // and, if valid, sets the account's new password.
 func (s *Service) ConfirmPasswordReset(ctx context.Context, email, code, newPassword string) error {
-	if err := s.VerifyCode(ctx, verificationPurposeResetPassword, email, code); err != nil {
+	if err := s.VerifyCode(ctx, VerificationPurposeResetPassword, email, code); err != nil {
 		return err
 	}
 

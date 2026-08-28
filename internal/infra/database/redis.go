@@ -21,7 +21,6 @@ func NewRedis(cfg *config.Config) *redis.Client {
 	_, err := client.Ping(ctx).Result()
 	if err != nil {
 		panic(fmt.Sprintf("could not connect to Redis: %s", err))
-		return nil
 	}
 
 	return client

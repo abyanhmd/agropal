@@ -9,30 +9,30 @@ import (
 )
 
 type User struct {
-	ID       uuid.UUID
-	Account  AccountInfo
-	Security SecurityInfo
-	Metadata UserMetadata
+	ID       uuid.UUID    `json:"id"`
+	Account  AccountInfo  `json:"account"`
+	Security SecurityInfo `json:"security"`
+	Metadata UserMetadata `json:"metadata"`
 }
 
 type AccountInfo struct {
-	Name     string
-	Email    string
-	Username string
-	Avatar   string
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Username string `json:"username"`
+	Avatar   string `json:"avatar"`
 }
 
 type SecurityInfo struct {
-	Password string
-	Role     config.Role
+	Password string      `json:"password"`
+	Role     config.Role `json:"role"`
 }
 
 type UserMetadata struct {
-	CreatedAt       time.Time
-	UpdatedAt       *time.Time
-	DeletedAt       *time.Time
-	LastLoginAt     *time.Time
-	EmailVerifiedAt *time.Time
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       *time.Time `json:"updated_at"`
+	DeletedAt       *time.Time `json:"deleted_at"`
+	LastLoginAt     *time.Time `json:"last_login_at"`
+	EmailVerifiedAt *time.Time `json:"email_verified_at"`
 }
 
 var (

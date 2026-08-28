@@ -12,5 +12,12 @@ CREATE TABLE IF NOT EXISTS notes (
     is_system_log BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+CREATE INDEX IF NOT EXISTS idx_notes_asset ON notes (asset_type, asset_id);
+CREATE INDEX IF NOT EXISTS idx_notes_author_id ON notes (author_id);
+
 -- +goose Down
+DROP INDEX IF EXISTS idx_notes_author_id;
+
+DROP INDEX IF EXISTS idx_notes_asset;
+
 DROP TABLE IF EXISTS notes;

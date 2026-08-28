@@ -7,7 +7,6 @@ import (
 	"agropal/internal/request"
 	"agropal/internal/utils"
 	"net/http"
-	"time"
 )
 
 type Handler struct {
@@ -68,18 +67,32 @@ func (h *Handler) VerifyRegister(w http.ResponseWriter, r *http.Request) {
 		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
 		return
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "rid",
-		Value:    tokenPair.RefreshToken.ID,
-		Expires:  time.Unix(tokenPair.RefreshToken.ExpiresAt, 0),
-		HttpOnly: true,
-		Path:     "/",
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	})
+	setAuthCookie(w, tokenPair)
 
 	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessEmailVerified, tokenPair)
+}
+
+func (h *Handler) ResendVerificationCode(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var req request.ResendVerificationRequest
+	if err := h.ioHandler.ReadRequestBody(r, &req); err != nil {
+		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
+		return
+	}
+
+	email, purpose, err := ToResendVerification(req, r.PathValue("purpose"))
+	if err != nil {
+		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		return
+	}
+
+	if err := h.authService.SendVerificationCode(ctx, purpose, email); err != nil {
+		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		return
+	}
+
+	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessVerificationSent, nil)
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
@@ -125,16 +138,7 @@ func (h *Handler) VerifyLogin(w http.ResponseWriter, r *http.Request) {
 		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
 		return
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "rid",
-		Value:    tokenPair.RefreshToken.ID,
-		Expires:  time.Unix(tokenPair.RefreshToken.ExpiresAt, 0),
-		HttpOnly: true,
-		Path:     "/",
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	})
+	setAuthCookie(w, tokenPair)
 
 	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessLogin, tokenPair)
 }
@@ -142,7 +146,7 @@ func (h *Handler) VerifyLogin(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	cookie, err := r.Cookie("rid")
+	cookie, err := r.Cookie(authCookieName)
 	if err != nil {
 		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
@@ -153,6 +157,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
 		return
 	}
+	setAuthCookie(w, tokenPair)
 
 	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessRefresh, tokenPair)
 }
@@ -160,7 +165,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	cookie, err := r.Cookie("rid")
+	cookie, err := r.Cookie(authCookieName)
 	if err != nil {
 		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
 		return
@@ -171,15 +176,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "rid",
-		Value:    "",
-		Expires:  time.Now().UTC(),
-		HttpOnly: true,
-		Path:     "/",
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	})
+	removeAuthCookie(w)
 
 	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessLogout, nil)
 }

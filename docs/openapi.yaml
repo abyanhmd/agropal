@@ -5,10 +5,17 @@ info:
     OpenAPI 3.0 specification for the Agropal backend.
 
     Notes on response conventions (derived from the implementation):
-    - Endpoints that return a resource (`GET`, and `POST /auth/login`/`/auth/refresh`) return the **raw DTO** as JSON (no envelope).
-    - Mutating endpoints (`POST` create, `PATCH`, `DELETE`) return a `SuccessEnvelope` carrying a machine-readable `key` and human-readable `message` from the response registry, instead of a bare status with no body.
+    - `GET` endpoints return the **raw DTO** as JSON (no envelope).
+    - Mutating endpoints (`POST` create, `PATCH`, `DELETE`) and every `/auth/*` endpoint return a `SuccessEnvelope` carrying a machine-readable `key` and human-readable `message` from the response registry, instead of a bare status with no body. Where a token pair is issued it is nested under the envelope's `data`.
     - Error responses are wrapped in a standard envelope (`ErrorEnvelope`).
     - All endpoints except `/auth/*` require a Bearer JWT access token.
+
+    Auth is a two-step (email OTP) flow:
+    - **Register:** `POST /auth/register` stages the account and emails a code; `POST /auth/register/verify` confirms the code, creates the user and returns a token pair.
+    - **Login:** `POST /auth/login` checks the password and emails a code (no token yet); `POST /auth/login/verify` confirms the code and returns a token pair.
+    - **Password reset:** `POST /auth/reset-password/request` emails a code; `POST /auth/reset-password/confirm` confirms the code and sets the new password.
+    - `POST /auth/{purpose}/resend-code` re-sends a code for `purpose` `register` or `reset_password`. `login` is not resendable — call `POST /auth/login` again.
+    - The verify endpoints also set an httpOnly `rid` cookie carrying the refresh token; `/auth/refresh` and `/auth/logout` read it.
   version: "1.0.0"
 servers:
   - url: http://localhost:8080/api/v1
@@ -30,7 +37,8 @@ paths:
   /auth/register:
     post:
       tags: [Auth]
-      summary: Register a new user
+      summary: Stage a new user and email a verification code
+      description: Validates the payload, stages the (password-hashed) account in Redis and emails a one-time code. No user row is created until `/auth/register/verify` succeeds.
       security: []
       requestBody:
         required: true
@@ -40,7 +48,7 @@ paths:
               $ref: '#/components/schemas/UserRequest'
       responses:
         '201':
-          description: Registration successful
+          description: Verification code sent (`AUTH.REGISTER_SUCCESS`)
           content:
             application/json:
               schema:
@@ -48,10 +56,43 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
+  /auth/register/verify:
+    post:
+      tags: [Auth]
+      summary: Confirm the registration code and create the account
+      description: On success the user is created, the email marked verified, a token pair returned in `data`, and an httpOnly `rid` cookie set.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificationRequest'
+      responses:
+        '200':
+          description: Email verified, token pair in `data` (`AUTH.EMAIL_VERIFIED`)
+          headers:
+            Set-Cookie:
+              description: httpOnly `rid` refresh-token cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenPair'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
   /auth/login:
     post:
       tags: [Auth]
-      summary: Login with email/username and password
+      summary: Check credentials and email a login code
+      description: Verifies email-or-username + password, then emails a one-time code. No token is issued here — call `/auth/login/verify` with the code.
       security: []
       requestBody:
         required: true
@@ -61,7 +102,36 @@ paths:
               $ref: '#/components/schemas/UserRequest'
       responses:
         '200':
-          description: Login successful, returns access/refresh token pair in `data`. A `rid` httpOnly cookie carrying the refresh token is also set.
+          description: Verification code sent (`AUTH.VERIFICATION_CODE_SENT`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/login/verify:
+    post:
+      tags: [Auth]
+      summary: Confirm the login code and issue a token pair
+      description: On success a token pair is returned in `data` and an httpOnly `rid` cookie is set.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificationRequest'
+      responses:
+        '200':
+          description: Logged in, token pair in `data` (`AUTH.LOGIN_SUCCESS`)
+          headers:
+            Set-Cookie:
+              description: httpOnly `rid` refresh-token cookie
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -71,24 +141,56 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/TokenPair'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /auth/{purpose}/resend-code:
+    post:
+      tags: [Auth]
+      summary: Re-send a verification code
+      security: []
+      parameters:
+        - name: purpose
+          in: path
+          required: true
+          description: '`login` is deliberately rejected — re-call `/auth/login` instead.'
+          schema:
+            type: string
+            enum: [register, reset_password]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendVerificationRequest'
+      responses:
+        '200':
+          description: Verification code sent (`AUTH.VERIFICATION_CODE_SENT`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
   /auth/refresh:
     post:
       tags: [Auth]
-      summary: Refresh an access token using the `rid` refresh cookie
+      summary: Rotate the token pair using the `rid` refresh cookie
+      description: Returns a new token pair in `data`. Note the `rid` cookie is not re-set by this endpoint.
       security: []
       parameters:
         - name: rid
           in: cookie
           required: true
-          description: httpOnly refresh token cookie set on login
+          description: httpOnly refresh token cookie set by the verify endpoints
           schema:
             type: string
       responses:
         '200':
-          description: New access/refresh token pair, returned in `data`
+          description: New token pair, returned in `data` (`AUTH.REFRESH_SUCCESS`)
           content:
             application/json:
               schema:
@@ -98,13 +200,58 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/TokenPair'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /auth/reset-password/request:
+    post:
+      tags: [Auth]
+      summary: Email a password-reset code
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '200':
+          description: Reset code sent (`AUTH.PASSWORD_RESET_EMAIL_SENT`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/reset-password/confirm:
+    post:
+      tags: [Auth]
+      summary: Confirm the reset code and set a new password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetConfirmRequest'
+      responses:
+        '200':
+          description: Password reset (`AUTH.PASSWORD_RESET_SUCCESS`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
   /auth/logout:
     post:
       tags: [Auth]
       summary: Logout and revoke the refresh token
+      description: Deletes the refresh-token row and clears the `rid` cookie.
       security: []
       parameters:
         - name: rid
@@ -114,11 +261,18 @@ paths:
             type: string
       responses:
         '200':
-          description: Logout successful
+          description: Logout successful (`AUTH.LOGOUT_SUCCESS`)
+          headers:
+            Set-Cookie:
+              description: expired `rid` cookie
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1028,6 +1182,46 @@ components:
         avatar:
           type: string
         password:
+          type: string
+          format: password
+
+    VerificationRequest:
+      type: object
+      description: Confirms a one-time code emailed by register/login. Backs `/auth/register/verify` and `/auth/login/verify`.
+      required: [email, code]
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+
+    ResendVerificationRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    PasswordResetRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    PasswordResetConfirmRequest:
+      type: object
+      required: [email, code, new_password]
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+        new_password:
           type: string
           format: password
 

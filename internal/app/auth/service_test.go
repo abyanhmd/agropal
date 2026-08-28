@@ -206,12 +206,12 @@ func TestService_SendVerificationCode(t *testing.T) {
 		}
 		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, redisClient)
 
-		if err := svc.SendVerificationCode(context.Background(), verificationPurposeRegister, email); err != nil {
+		if err := svc.SendVerificationCode(context.Background(), VerificationPurposeRegister, email); err != nil {
 			t.Fatalf("SendVerificationCode() error = %v, want nil", err)
 		}
 
-		if published.To != email || published.Purpose != string(verificationPurposeRegister) || published.Code == "" {
-			t.Errorf("published task = %+v, want To=%q Purpose=%q non-empty Code", published, email, verificationPurposeRegister)
+		if published.To != email || published.Purpose != string(VerificationPurposeRegister) || published.Code == "" {
+			t.Errorf("published task = %+v, want To=%q Purpose=%q non-empty Code", published, email, VerificationPurposeRegister)
 		}
 
 		raw, err := redisClient.Get(context.Background(), "register:"+email).Result()
@@ -247,7 +247,7 @@ func TestService_SendVerificationCode(t *testing.T) {
 		}
 		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, redisClient)
 
-		err := svc.SendVerificationCode(context.Background(), verificationPurposeRegister, email)
+		err := svc.SendVerificationCode(context.Background(), VerificationPurposeRegister, email)
 		if !errors.Is(err, dAuth.ErrRateLimited) {
 			t.Errorf("SendVerificationCode() error = %v, want %v", err, dAuth.ErrRateLimited)
 		}
@@ -263,7 +263,7 @@ func TestService_SendVerificationCode(t *testing.T) {
 		}
 		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, redisClient)
 
-		err := svc.SendVerificationCode(context.Background(), verificationPurposeRegister, email)
+		err := svc.SendVerificationCode(context.Background(), VerificationPurposeRegister, email)
 		if !errors.Is(err, wantErr) {
 			t.Errorf("SendVerificationCode() error = %v, want %v", err, wantErr)
 		}
@@ -299,7 +299,7 @@ func TestService_VerifyCode(t *testing.T) {
 		}, verificationCodeTTL)
 		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, &fakePublisher{}, &fakeTokenProvider{}, redisClient)
 
-		if err := svc.VerifyCode(context.Background(), verificationPurposeRegister, email, code); err != nil {
+		if err := svc.VerifyCode(context.Background(), VerificationPurposeRegister, email, code); err != nil {
 			t.Fatalf("VerifyCode() error = %v, want nil", err)
 		}
 
@@ -320,7 +320,7 @@ func TestService_VerifyCode(t *testing.T) {
 		}, verificationCodeTTL)
 		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, &fakePublisher{}, &fakeTokenProvider{}, redisClient)
 
-		err := svc.VerifyCode(context.Background(), verificationPurposeRegister, email, "wrong-code")
+		err := svc.VerifyCode(context.Background(), VerificationPurposeRegister, email, "wrong-code")
 		if !errors.Is(err, dAuth.ErrVerificationCodeInvalid) {
 			t.Errorf("VerifyCode() error = %v, want %v", err, dAuth.ErrVerificationCodeInvalid)
 		}
@@ -337,7 +337,7 @@ func TestService_VerifyCode(t *testing.T) {
 		redisClient := newTestRedis(t)
 		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, &fakePublisher{}, &fakeTokenProvider{}, redisClient)
 
-		err := svc.VerifyCode(context.Background(), verificationPurposeRegister, email, code)
+		err := svc.VerifyCode(context.Background(), VerificationPurposeRegister, email, code)
 		if !errors.Is(err, dAuth.ErrVerificationCodeNotFound) {
 			t.Errorf("VerifyCode() error = %v, want %v", err, dAuth.ErrVerificationCodeNotFound)
 		}
@@ -352,7 +352,7 @@ func TestService_VerifyCode(t *testing.T) {
 		}, verificationCodeTTL)
 		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, &fakePublisher{}, &fakeTokenProvider{}, redisClient)
 
-		err := svc.VerifyCode(context.Background(), verificationPurposeRegister, email, code)
+		err := svc.VerifyCode(context.Background(), VerificationPurposeRegister, email, code)
 		if !errors.Is(err, dAuth.ErrVerificationCodeUsed) {
 			t.Errorf("VerifyCode() error = %v, want %v", err, dAuth.ErrVerificationCodeUsed)
 		}
@@ -367,7 +367,7 @@ func TestService_VerifyCode(t *testing.T) {
 		}, verificationCodeTTL)
 		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, &fakePublisher{}, &fakeTokenProvider{}, redisClient)
 
-		err := svc.VerifyCode(context.Background(), verificationPurposeRegister, email, code)
+		err := svc.VerifyCode(context.Background(), VerificationPurposeRegister, email, code)
 		if !errors.Is(err, dAuth.ErrVerificationCodeExpired) {
 			t.Errorf("VerifyCode() error = %v, want %v", err, dAuth.ErrVerificationCodeExpired)
 		}
@@ -383,7 +383,7 @@ func TestService_VerifyCode(t *testing.T) {
 		}, verificationCodeTTL)
 		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, &fakePublisher{}, &fakeTokenProvider{}, redisClient)
 
-		err := svc.VerifyCode(context.Background(), verificationPurposeRegister, email, code)
+		err := svc.VerifyCode(context.Background(), VerificationPurposeRegister, email, code)
 		if !errors.Is(err, dAuth.ErrTooManyAttempts) {
 			t.Errorf("VerifyCode() error = %v, want %v", err, dAuth.ErrTooManyAttempts)
 		}
@@ -393,16 +393,14 @@ func TestService_VerifyCode(t *testing.T) {
 /* ==================== Tests: Register / VerifyRegistration ==================== */
 
 func TestService_Register(t *testing.T) {
-	t.Run("creates the user and sends a verification code", func(t *testing.T) {
+	t.Run("stages the hashed user in redis and sends a verification code", func(t *testing.T) {
 		redisClient := newTestRedis(t)
-		var createdUser dUser.User
+		// createUserFunc is deliberately left unstubbed: Register must not
+		// touch Postgres at all - the account is only created once
+		// VerifyRegistration confirms the code.
 		userRepo := &fakeUserRepository{
 			findUserByEmailFunc: func(context.Context, database.Querier, string) (dUser.User, error) {
 				return dUser.User{}, nil
-			},
-			createUserFunc: func(_ context.Context, _ database.Querier, u dUser.User) error {
-				createdUser = u
-				return nil
 			},
 		}
 		pub := &fakePublisher{publishMessageFunc: func(context.Context, []byte) error { return nil }}
@@ -413,27 +411,31 @@ func TestService_Register(t *testing.T) {
 			t.Fatalf("Register() error = %v, want nil", err)
 		}
 
-		if createdUser.Account.Email != "jane@example.com" {
-			t.Errorf("createdUser.Account.Email = %q, want %q", createdUser.Account.Email, "jane@example.com")
+		staged, err := redisClient.Get(context.Background(), registerPendingKey(cmd.Email)).Bytes()
+		if err != nil {
+			t.Fatalf("staged user not found in redis under %q: %v", registerPendingKey(cmd.Email), err)
 		}
-		if createdUser.Security.Password == "Str0ng!Pass" {
-			t.Error("createdUser.Security.Password is the plaintext password, want a bcrypt hash")
+		var stagedUser dUser.User
+		if err := json.Unmarshal(staged, &stagedUser); err != nil {
+			t.Fatalf("unmarshal staged user: %v", err)
 		}
-		if err := bcrypt.CompareHashAndPassword([]byte(createdUser.Security.Password), []byte("Str0ng!Pass")); err != nil {
+
+		if stagedUser.Account.Email != "jane@example.com" {
+			t.Errorf("stagedUser.Account.Email = %q, want %q", stagedUser.Account.Email, "jane@example.com")
+		}
+		if stagedUser.Security.Password == "Str0ng!Pass" {
+			t.Error("stagedUser.Security.Password is the plaintext password, want a bcrypt hash")
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(stagedUser.Security.Password), []byte("Str0ng!Pass")); err != nil {
 			t.Errorf("stored password does not verify against the original: %v", err)
 		}
 	})
 
-	t.Run("does not create the user when sending the verification code fails", func(t *testing.T) {
+	t.Run("leaves no usable registration when sending the verification code fails", func(t *testing.T) {
 		redisClient := newTestRedis(t)
-		createUserCalled := false
 		userRepo := &fakeUserRepository{
 			findUserByEmailFunc: func(context.Context, database.Querier, string) (dUser.User, error) {
 				return dUser.User{}, nil
-			},
-			createUserFunc: func(_ context.Context, _ database.Querier, u dUser.User) error {
-				createUserCalled = true
-				return nil
 			},
 		}
 		pub := &fakePublisher{publishMessageFunc: func(context.Context, []byte) error { return errors.New("broker unavailable") }}
@@ -444,8 +446,12 @@ func TestService_Register(t *testing.T) {
 		if err == nil {
 			t.Fatal("Register() error = nil, want error when SendVerificationCode fails")
 		}
-		if createUserCalled {
-			t.Error("Register() called CreateUser after SendVerificationCode failed, want the account left uncreated so the caller can retry")
+
+		// SendVerificationCode cleans up its own code key on a failed
+		// publish, so VerifyRegistration has nothing to verify against even
+		// though the staged user blob may still be sitting in redis.
+		if _, err := redisClient.Get(context.Background(), "register:"+cmd.Email).Result(); !errors.Is(err, redis.Nil) {
+			t.Errorf("verification code key still present after a failed send: err = %v", err)
 		}
 	})
 
@@ -480,11 +486,18 @@ func TestService_VerifyRegistration(t *testing.T) {
 	if err := redisClient.Set(context.Background(), "register:"+email, payload, verificationCodeTTL).Err(); err != nil {
 		t.Fatalf("seed redis: %v", err)
 	}
+	stagedUser, _ := json.Marshal(dUser.User{ID: userID, Account: dUser.AccountInfo{Email: email}})
+	if err := redisClient.Set(context.Background(), registerPendingKey(email), stagedUser, verificationCodeTTL).Err(); err != nil {
+		t.Fatalf("seed redis: %v", err)
+	}
 
-	var verifiedID uuid.UUID
+	var createdUser, verifiedID uuid.UUID
+	// findUserByEmailFunc is deliberately left unstubbed: VerifyRegistration
+	// must build the account from the staged redis payload, not look it up.
 	userRepo := &fakeUserRepository{
-		findUserByEmailFunc: func(context.Context, database.Querier, string) (dUser.User, error) {
-			return dUser.User{ID: userID, Account: dUser.AccountInfo{Email: email}}, nil
+		createUserFunc: func(_ context.Context, _ database.Querier, u dUser.User) error {
+			createdUser = u.ID
+			return nil
 		},
 		verifyUserEmailFunc: func(_ context.Context, _ database.Querier, id uuid.UUID, _ time.Time) error {
 			verifiedID = id
@@ -512,6 +525,9 @@ func TestService_VerifyRegistration(t *testing.T) {
 	tokenPair, err := svc.VerifyRegistration(context.Background(), email, code)
 	if err != nil {
 		t.Fatalf("VerifyRegistration() error = %v, want nil", err)
+	}
+	if createdUser != userID {
+		t.Errorf("CreateUser called with ID = %v, want %v", createdUser, userID)
 	}
 	if verifiedID != userID {
 		t.Errorf("VerifyUserEmail called with %v, want %v", verifiedID, userID)

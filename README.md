@@ -6,7 +6,7 @@ Agropal is a backend platform for managing farms and farming activity: farms and
 
 - **Language:** Go 1.24
 - **Database:** PostgreSQL (`pgx/v5`, `lib/pq`, `sqlx`)
-- **Cache/Session:** Redis (configured, not yet used by any service)
+- **Cache/Session:** Redis (holds staged registrations, one-time verification codes, and resend cooldowns for the auth flow)
 - **Auth:** JWT (`golang-jwt/jwt/v5`), AES-GCM-encrypted refresh tokens at rest
 - **Config:** Viper (`spf13/viper`) + `.env` (`godotenv`)
 - **Logging:** `rs/zerolog`
@@ -38,7 +38,7 @@ backend/
 ├── config/                   # config.yaml + env-backed Config loader
 ├── internal/
 │   ├── api/                  # HTTP layer, one package per domain
-│   │   ├── auth/             #   register/login/refresh/logout
+│   │   ├── auth/             #   register/login (email-code confirmed), refresh, logout, password reset
 │   │   ├── farm/             #   farm CRUD
 │   │   ├── weather/          #   weather locations per farm
 │   │   ├── product/          #   products + price/stock history
@@ -69,9 +69,11 @@ backend/
 
 All routes are mounted under `/api/v1`. Everything except `/auth/*` requires `Authorization: Bearer <access token>`.
 
+Auth uses a two-step email flow. `POST /auth/register` and `POST /auth/login` only email a one-time code; the matching `/verify` call confirms the code and returns the token pair. `POST /auth/{purpose}/resend-code` re-sends a code for `purpose` `register` or `reset_password`. Password reset is `reset-password/request` followed by `reset-password/confirm`.
+
 | Domain | Routes |
 |---|---|
-| Auth | `POST /auth/register`, `/login`, `/refresh`, `/logout` |
+| Auth | `POST /auth/register`, `/register/verify`, `/login`, `/login/verify`, `/{purpose}/resend-code`, `/refresh`, `/logout`, `/reset-password/request`, `/reset-password/confirm` |
 | Farm | `POST/GET /farm`, `GET/PATCH/DELETE /farm/{farm_id}` |
 | Weather | `POST/GET /farm/{farm_id}/weather`, `PATCH/DELETE /farm/{farm_id}/weather/{weather_id}` |
 | Product | `POST/GET /farm/{farm_id}/product`, `GET/PATCH/DELETE .../product/{product_id}`, plus nested `/price` and `/stock` create+delete |
@@ -81,7 +83,7 @@ All routes are mounted under `/api/v1`. Everything except `/auth/*` requires `Au
 
 ## Response Conventions
 
-Mutating endpoints (`POST` create, `PATCH`, `DELETE`) respond with a success envelope (`{info: {code, key, message}, data, request_id}`) instead of a bare status with no body. `key`/`message` are looked up in `response.SuccessRegistry` (`internal/response/registry_success.go`) by the domain's `SuccessKey` (e.g. `dFarm.SuccessCreated` → `"FARM.CREATE_SUCCESS"`), defined alongside each domain's error keys in `internal/domain/<domain>/entity.go`. `GET` endpoints and `POST /auth/login`/`/auth/refresh` return the raw DTO instead, and errors use the equivalent `ErrorRegistry`-backed envelope. See `docs/openapi.yaml` and `docs/README.md` for the full endpoint-by-endpoint mapping.
+Mutating endpoints (`POST` create, `PATCH`, `DELETE`) respond with a success envelope (`{info: {code, key, message}, data, request_id}`) instead of a bare status with no body. `key`/`message` are looked up in `response.SuccessRegistry` (`internal/response/registry_success.go`) by the domain's `SuccessKey` (e.g. `dFarm.SuccessCreated` → `"FARM.CREATE_SUCCESS"`), defined alongside each domain's error keys in `internal/domain/<domain>/entity.go`. `GET` endpoints return the raw DTO instead, and errors use the equivalent `ErrorRegistry`-backed envelope. The `/auth/*` endpoints also use the success envelope; when a token pair is issued (the `/verify` endpoints and `/auth/refresh`) it sits under the envelope's `data` field. See `docs/openapi.yaml` and `docs/README.md` for the full endpoint-by-endpoint mapping.
 
 Request bodies are validated with [go-playground/validator](https://github.com/go-playground/validator) via `validate` struct tags on the `internal/request` DTOs (`internal/utils/validate.go`). A handler calls `ioHandler.ValidateStruct(ctx, w, req)` right after decoding the body; on failure it writes the `COMMON.VALIDATION_FAILED` error with the envelope's `errors` field populated as `{field: [messages]}`, one entry per failing field. Endpoints with validation semantics that don't map cleanly onto struct tags (e.g. auth's email/password rules, which need specific per-rule error keys) keep their own hand-written checks in `internal/api/<domain>/mapper.go` instead.
 
@@ -91,7 +93,8 @@ Request bodies are validated with [go-playground/validator](https://github.com/g
 
 - Go 1.24+
 - PostgreSQL
-- Redis (reachable, though nothing depends on it functioning yet)
+- Redis (the auth flow stores staged registrations and verification codes here, so the server needs it running)
+- RabbitMQ (the api publishes verification emails to it; run `cmd/email` to consume and send them)
 
 ### Configuration
 
@@ -167,13 +170,14 @@ This builds and runs `go-api`, `go-migrate` (applies migrations once, then exits
 go build ./...
 go vet ./...
 gofmt -l .
+go test ./...
 ```
 
-There is no automated test suite yet.
+The same steps run in CI on every push and pull request against `master` (`.github/workflows/ci.yml`), with tests run under `-race`.
 
 ## Domains
 
-- **Auth**: registration, login, refresh-token rotation (AES-GCM encrypted at rest), logout, password reset (token issued via the refresh-token store)
+- **Auth**: registration and login (both confirmed by a one-time code emailed to the user), refresh-token rotation (AES-GCM encrypted at rest), logout, password reset by emailed code
 - **User**: profile (name/avatar), password change, soft/hard delete, listing users by related asset
 - **Farm**: a user's farms
 - **Weather**: weather-tracked locations (lat/long) attached to a farm
@@ -186,4 +190,5 @@ There is no automated test suite yet.
 - Not every mutation has a dedicated success key yet; post/comment engagement endpoints (`POST /post/{post_id}/engagement`, `POST /comment/{comment_id}/engagement`) still return a bare `201` with no body.
 - `app/product`'s `UpdateProduct` records an audit note for changed fields but doesn't yet persist the new values.
 - `boilerplate/*` is scaffolded but empty.
-- No automated tests.
+- `domain/note` has an entity, repository, and migration and is written to as an audit trail, but there is no read API for notes yet.
+- `refresh_tokens` rows are only removed on rotation or logout; a token left to expire on its own is never swept from the table.

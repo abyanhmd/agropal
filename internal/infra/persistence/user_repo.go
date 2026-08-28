@@ -13,7 +13,24 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
+
+// uniqueViolationField maps a unique-constraint violation on the users
+// table to the domain error the caller should see, by inspecting which
+// column the constraint covers. Postgres names an inline `UNIQUE` column
+// constraint "<table>_<column>_key" by default, so a substring match on the
+// column name is enough without hardcoding the exact constraint name.
+func uniqueViolationField(pqErr *pq.Error) error {
+	switch {
+	case strings.Contains(pqErr.Constraint, "email"):
+		return dUser.ErrEmailExists
+	case strings.Contains(pqErr.Constraint, "username"):
+		return dUser.ErrUsernameExists
+	default:
+		return nil
+	}
+}
 
 type userRepo struct {
 	logger *pkg.Logger
@@ -24,10 +41,6 @@ func NewUserRepository(l *pkg.Logger) dUser.Repository {
 }
 
 func (r *userRepo) CreateUser(ctx context.Context, q database.Querier, user dUser.User) error {
-	// updated_at is NOT NULL DEFAULT NOW() on the users table; a fresh user
-	// has no Metadata.UpdatedAt yet (it's nil until the first update), so
-	// it's deliberately left out of the column list here to let the
-	// column default apply instead of binding an explicit NULL.
 	query := `
 		INSERT INTO users (
 			user_id, name, email, username,
@@ -41,6 +54,12 @@ func (r *userRepo) CreateUser(ctx context.Context, q database.Querier, user dUse
 
 	userModel := ToUserModel(user)
 	if _, err := q.NamedExecContext(ctx, query, userModel); err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			if domainErr := uniqueViolationField(pqErr); domainErr != nil {
+				return domainErr
+			}
+		}
 		r.logger.Error(ctx, shared.AssetUser, err.Error())
 		return err
 	}
@@ -132,9 +151,8 @@ func (r *userRepo) UpdateUser(ctx context.Context, q database.Querier, user dUse
 
 func (r *userRepo) UpdateUserPassword(ctx context.Context, q database.Querier, userID uuid.UUID, password string) error {
 	updateQuery := `
-		UPDATE users SET
-			password = $1
-		WHERE user_id = $2;`
+		UPDATE users SET password = $1
+		WHERE user_id = $2 AND deleted_at IS NULL;`
 
 	result, err := q.ExecContext(ctx, updateQuery, password, userID)
 	if err != nil {
@@ -149,7 +167,7 @@ func (r *userRepo) UpdateUserPassword(ctx context.Context, q database.Querier, u
 }
 
 func (r *userRepo) VerifyUserEmail(ctx context.Context, q database.Querier, userID uuid.UUID, verifiedAt time.Time) error {
-	query := `UPDATE users SET email_verified_at = $1 WHERE user_id = $2;`
+	query := `UPDATE users SET email_verified_at = $1 WHERE user_id = $2 AND deleted_at IS NULL;`
 
 	result, err := q.ExecContext(ctx, query, verifiedAt, userID)
 	if err != nil {
@@ -164,7 +182,7 @@ func (r *userRepo) VerifyUserEmail(ctx context.Context, q database.Querier, user
 }
 
 func (r *userRepo) SoftDeleteUser(ctx context.Context, q database.Querier, userID uuid.UUID, deletedAt time.Time) error {
-	query := `UPDATE users SET deleted_at = $1 WHERE user_id = $2;`
+	query := `UPDATE users SET deleted_at = $1 WHERE user_id = $2 AND deleted_at IS NULL;`
 
 	result, err := q.ExecContext(ctx, query, deletedAt, userID)
 	if err != nil {
