@@ -74,6 +74,9 @@ func TestLoadConfig(t *testing.T) {
 		if cfg.Server.Port != 8080 {
 			t.Errorf("Server.Port = %d, want %d", cfg.Server.Port, 8080)
 		}
+		if len(cfg.Server.TrustedProxies) != 0 {
+			t.Errorf("Server.TrustedProxies = %v, want empty when unset", cfg.Server.TrustedProxies)
+		}
 		if cfg.Path.Migration != "internal/migration" {
 			t.Errorf("Path.Migration = %q, want %q", cfg.Path.Migration, "internal/migration")
 		}
@@ -144,6 +147,65 @@ func TestLoadConfig(t *testing.T) {
 		}
 		if cfg.Secret.Smtp != "smtp-secret" {
 			t.Errorf("Secret.Smtp = %q, want %q", cfg.Secret.Smtp, "smtp-secret")
+		}
+	})
+
+	t.Run("Reads server.trusted_proxies List", func(t *testing.T) {
+		setEnvBindings(t)
+		yaml := `
+stage: "dev"
+server:
+  host: "0.0.0.0"
+  port: 8080
+  trusted_proxies:
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+path:
+  migration: "internal/migration"
+  log: "logs"
+`
+		path := writeTestConfigFile(t, yaml)
+
+		cfg := LoadConfig(path)
+
+		want := []string{"10.0.0.0/8", "172.16.0.0/12"}
+		if len(cfg.Server.TrustedProxies) != len(want) {
+			t.Fatalf("TrustedProxies = %v, want %v", cfg.Server.TrustedProxies, want)
+		}
+		for i, w := range want {
+			if cfg.Server.TrustedProxies[i] != w {
+				t.Errorf("TrustedProxies[%d] = %q, want %q", i, cfg.Server.TrustedProxies[i], w)
+			}
+		}
+	})
+
+	t.Run("Reads cors.allowed_origins List", func(t *testing.T) {
+		setEnvBindings(t)
+		yaml := `
+stage: "dev"
+server:
+  host: "0.0.0.0"
+  port: 8080
+cors:
+  allowed_origins:
+    - "https://app.example.com"
+    - "http://localhost:5173"
+path:
+  migration: "internal/migration"
+  log: "logs"
+`
+		path := writeTestConfigFile(t, yaml)
+
+		cfg := LoadConfig(path)
+
+		want := []string{"https://app.example.com", "http://localhost:5173"}
+		if len(cfg.Cors.AllowedOrigins) != len(want) {
+			t.Fatalf("Cors.AllowedOrigins = %v, want %v", cfg.Cors.AllowedOrigins, want)
+		}
+		for i, w := range want {
+			if cfg.Cors.AllowedOrigins[i] != w {
+				t.Errorf("Cors.AllowedOrigins[%d] = %q, want %q", i, cfg.Cors.AllowedOrigins[i], w)
+			}
 		}
 	})
 

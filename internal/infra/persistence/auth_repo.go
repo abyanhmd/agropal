@@ -6,6 +6,8 @@ import (
 	"agropal/internal/infra/database"
 	"agropal/pkg"
 	"context"
+
+	"github.com/google/uuid"
 )
 
 type authRepo struct {
@@ -53,6 +55,17 @@ func (r *authRepo) DeleteRefreshToken(ctx context.Context, q database.Querier, r
 	query := `DELETE FROM refresh_tokens WHERE refresh_token_id = $1;`
 
 	if _, err := q.ExecContext(ctx, query, refreshTokenID); err != nil {
+		r.logger.Error(ctx, shared.AssetFarm, err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func (r *authRepo) InvalidateSessions(ctx context.Context, q database.Querier, userID uuid.UUID) error {
+	query := `DELETE FROM refresh_tokens WHERE user_id = $1;`
+
+	if _, err := q.ExecContext(ctx, query, userID); err != nil {
 		r.logger.Error(ctx, shared.AssetFarm, err.Error())
 		return err
 	}

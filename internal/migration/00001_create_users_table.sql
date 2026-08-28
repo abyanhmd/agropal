@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     refresh_token_id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(user_id),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     expires_at TIMESTAMPTZ NOT NULL,
     token TEXT NOT NULL,
     user_agent TEXT,

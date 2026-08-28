@@ -11,6 +11,7 @@ type TransactionCommand struct {
 	Date        time.Time
 	Type        dTransaction.TransactionType
 	Amount      float64
+	Currency    string
 	Description string
 }
 
@@ -20,6 +21,7 @@ func (c TransactionCommand) ToDomain(productID, transactionID uuid.UUID) dTransa
 		Date:        c.Date,
 		Type:        c.Type,
 		Amount:      c.Amount,
+		Currency:    c.Currency,
 		Description: c.Description,
 		ProductID:   productID,
 	}

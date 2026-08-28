@@ -254,7 +254,7 @@ func TestHandler_Create(t *testing.T) {
 		}
 		h := newTestHandler(userRepo, farmRepo, productRepo, transactionRepo)
 
-		req := authedRequest(http.MethodPost, "/transactions", `{"transactions":[{"date":"2024-01-01T00:00:00Z","type":"INCOME","amount":100,"description":"sale"}]}`, userID, "user")
+		req := authedRequest(http.MethodPost, "/transactions", `{"transactions":[{"date":"2024-01-01T00:00:00Z","type":"INCOME","amount":100,"currency":"USD","description":"sale"}]}`, userID, "user")
 		req.SetPathValue("farm_id", farmID.String())
 		req.SetPathValue("product_id", productID.String())
 		rec := httptest.NewRecorder()
@@ -318,7 +318,7 @@ func TestHandler_Create(t *testing.T) {
 		}
 		h := newTestHandler(userRepo, farmRepo, &fakeProductRepository{}, &fakeTransactionRepository{})
 
-		req := authedRequest(http.MethodPost, "/transactions", `{"transactions":[{"date":"2024-01-01T00:00:00Z","type":"INCOME","amount":100,"description":"sale"}]}`, userID, "user")
+		req := authedRequest(http.MethodPost, "/transactions", `{"transactions":[{"date":"2024-01-01T00:00:00Z","type":"INCOME","amount":100,"currency":"USD","description":"sale"}]}`, userID, "user")
 		req.SetPathValue("farm_id", farmID.String())
 		req.SetPathValue("product_id", productID.String())
 		rec := httptest.NewRecorder()
@@ -547,7 +547,7 @@ func TestHandler_Update(t *testing.T) {
 		}
 		h := newTestHandler(userRepo, farmRepo, productRepo, transactionRepo)
 
-		req := authedRequest(http.MethodPut, "/transactions", `{"date":"2024-01-01T00:00:00Z","type":"EXPENSE","amount":50,"description":"feed"}`, userID, "user")
+		req := authedRequest(http.MethodPut, "/transactions", `{"date":"2024-01-01T00:00:00Z","type":"EXPENSE","amount":50,"currency":"USD","description":"feed"}`, userID, "user")
 		req.SetPathValue("farm_id", farmID.String())
 		req.SetPathValue("product_id", productID.String())
 		req.SetPathValue("transaction_id", transactionID.String())
@@ -567,7 +567,7 @@ func TestHandler_Update(t *testing.T) {
 	t.Run("Invalid Type Fails Validation", func(t *testing.T) {
 		h := newTestHandler(&fakeUserRepository{}, &fakeFarmRepository{}, &fakeProductRepository{}, &fakeTransactionRepository{})
 
-		req := authedRequest(http.MethodPut, "/transactions", `{"date":"2024-01-01T00:00:00Z","type":"NOT_A_TYPE","amount":50,"description":"feed"}`, userID, "user")
+		req := authedRequest(http.MethodPut, "/transactions", `{"date":"2024-01-01T00:00:00Z","type":"NOT_A_TYPE","amount":50,"currency":"USD","description":"feed"}`, userID, "user")
 		req.SetPathValue("farm_id", farmID.String())
 		req.SetPathValue("product_id", productID.String())
 		req.SetPathValue("transaction_id", transactionID.String())

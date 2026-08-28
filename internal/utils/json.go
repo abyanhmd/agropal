@@ -84,7 +84,8 @@ func (io *IOHandler) WriteSuccess(ctx context.Context, w http.ResponseWriter, ke
 			Key:     key.String(),
 			Message: detail.Message,
 		},
-		Data: data,
+		Data:      data,
+		RequestID: shared.GetMetadata(ctx, shared.KeyRequestID),
 	})
 }
 

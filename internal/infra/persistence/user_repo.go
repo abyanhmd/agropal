@@ -125,8 +125,24 @@ func (r *userRepo) FindUserByUsername(ctx context.Context, q database.Querier, u
 }
 
 func (r *userRepo) ListUsers(ctx context.Context, q database.Querier) ([]dUser.User, error) {
-	//TODO implement me
-	panic("implement me")
+	query := `
+		SELECT *
+		FROM users
+		WHERE deleted_at IS NULL
+		ORDER BY created_at;`
+
+	var userModels []UserModel
+	if err := q.SelectContext(ctx, &userModels, query); err != nil {
+		r.logger.Error(ctx, shared.AssetUser, err.Error())
+		return nil, err
+	}
+
+	users := make([]dUser.User, len(userModels))
+	for i, m := range userModels {
+		users[i] = m.ToDomain()
+	}
+
+	return users, nil
 }
 
 func (r *userRepo) UpdateUser(ctx context.Context, q database.Querier, user dUser.User) error {

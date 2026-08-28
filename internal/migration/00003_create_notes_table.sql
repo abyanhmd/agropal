@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS notes (
     update_field VARCHAR(50),
     old_value TEXT,
     new_value TEXT,
-    author_id UUID NOT NULL REFERENCES users(user_id),
+    author_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     is_system_log BOOLEAN NOT NULL DEFAULT FALSE
 );
 

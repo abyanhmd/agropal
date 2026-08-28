@@ -3,6 +3,7 @@ package user
 import (
 	"agropal/config"
 	aUser "agropal/internal/app/user"
+	dAuth "agropal/internal/domain/auth"
 	dNote "agropal/internal/domain/note"
 	"agropal/internal/domain/shared"
 	dUser "agropal/internal/domain/user"
@@ -38,7 +39,7 @@ type fakeUserRepository struct {
 	updateUserPasswordFunc func(ctx context.Context, q database.Querier, userID uuid.UUID, password string) error
 	softDeleteUserFunc     func(ctx context.Context, q database.Querier, userID uuid.UUID, deletedAt time.Time) error
 	deleteUserFunc         func(ctx context.Context, q database.Querier, userID uuid.UUID) error
-	listUsersByAssetFunc   func(ctx context.Context, q database.Querier, assetType shared.AssetType, assetID uuid.UUID) ([]dUser.User, error)
+	listUsersFunc          func(ctx context.Context, q database.Querier) ([]dUser.User, error)
 }
 
 func (f *fakeUserRepository) CreateUser(context.Context, database.Querier, dUser.User) error {
@@ -60,8 +61,11 @@ func (f *fakeUserRepository) FindUserByUsername(context.Context, database.Querie
 	panic("fakeUserRepository: FindUserByUsername not stubbed")
 }
 
-func (f *fakeUserRepository) ListUsers(context.Context, database.Querier) ([]dUser.User, error) {
-	panic("fakeUserRepository: ListUsers not stubbed")
+func (f *fakeUserRepository) ListUsers(ctx context.Context, q database.Querier) ([]dUser.User, error) {
+	if f.listUsersFunc == nil {
+		panic("fakeUserRepository: listUsersFunc not stubbed")
+	}
+	return f.listUsersFunc(ctx, q)
 }
 
 func (f *fakeUserRepository) UpdateUser(ctx context.Context, q database.Querier, user dUser.User) error {
@@ -96,11 +100,28 @@ func (f *fakeUserRepository) DeleteUser(ctx context.Context, q database.Querier,
 	return f.deleteUserFunc(ctx, q, userID)
 }
 
-func (f *fakeUserRepository) ListUsersByAsset(ctx context.Context, q database.Querier, assetType shared.AssetType, assetID uuid.UUID) ([]dUser.User, error) {
-	if f.listUsersByAssetFunc == nil {
-		panic("fakeUserRepository: listUsersByAssetFunc not stubbed")
-	}
-	return f.listUsersByAssetFunc(ctx, q, assetType, assetID)
+func (f *fakeUserRepository) ListUsersByAsset(context.Context, database.Querier, shared.AssetType, uuid.UUID) ([]dUser.User, error) {
+	panic("fakeUserRepository: ListUsersByAsset not stubbed")
+}
+
+// fakeAuthRepository implements dAuth.Repository; user.Service only calls
+// InvalidateSessions (on a password change), which defaults to a no-op here.
+type fakeAuthRepository struct{}
+
+func (f *fakeAuthRepository) CreateRefreshToken(context.Context, database.Querier, dAuth.RefreshToken) error {
+	panic("fakeAuthRepository: CreateRefreshToken not stubbed")
+}
+
+func (f *fakeAuthRepository) GetRefreshToken(context.Context, database.Querier, string) (dAuth.RefreshToken, error) {
+	panic("fakeAuthRepository: GetRefreshToken not stubbed")
+}
+
+func (f *fakeAuthRepository) DeleteRefreshToken(context.Context, database.Querier, string) error {
+	panic("fakeAuthRepository: DeleteRefreshToken not stubbed")
+}
+
+func (f *fakeAuthRepository) InvalidateSessions(context.Context, database.Querier, uuid.UUID) error {
+	return nil
 }
 
 // fakeNoteRepository implements dNote.Repository.
@@ -131,7 +152,7 @@ func (f *fakeNoteRepository) DeleteNotes(context.Context, database.Querier, []uu
 
 func newTestHandler(userRepo dUser.Repository, noteRepo dNote.Repository) *Handler {
 	logger := pkg.NewLogger(config.Config{})
-	svc := aUser.NewService(fakeTransactor{}, userRepo, noteRepo)
+	svc := aUser.NewService(fakeTransactor{}, userRepo, &fakeAuthRepository{}, noteRepo)
 	ioHandler := utils.NewIOHandler(logger, nil, utils.NewValidator())
 	h := NewHandler(ioHandler, svc)
 	return &h
@@ -520,21 +541,17 @@ func TestHandler_Delete(t *testing.T) {
 /* ==================== Tests: GetUsers ====================== */
 
 func TestHandler_GetUsers(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
-		callerID := uuid.New()
-		assetID := uuid.New()
+	t.Run("Admin Success", func(t *testing.T) {
+		adminID := uuid.New()
 		userRepo := &fakeUserRepository{
-			findUserByIDFunc: func(context.Context, database.Querier, uuid.UUID) (dUser.User, error) {
-				return dUser.User{ID: callerID}, nil
-			},
-			listUsersByAssetFunc: func(context.Context, database.Querier, shared.AssetType, uuid.UUID) ([]dUser.User, error) {
+			listUsersFunc: func(context.Context, database.Querier) ([]dUser.User, error) {
 				return []dUser.User{{ID: uuid.New(), Account: dUser.AccountInfo{Email: "a@example.com"}}}, nil
 			},
 		}
 		h := newTestHandler(userRepo, &fakeNoteRepository{})
 
-		req := httptest.NewRequest(http.MethodGet, "/users?asset_type=Farm&asset_id="+assetID.String(), nil)
-		req = authedRequest(req, callerID, config.RoleUser)
+		req := httptest.NewRequest(http.MethodGet, "/users", nil)
+		req = authedRequest(req, adminID, config.RoleAdmin)
 		rec := httptest.NewRecorder()
 
 		h.GetUsers(rec, req)
@@ -551,31 +568,23 @@ func TestHandler_GetUsers(t *testing.T) {
 		}
 	})
 
-	t.Run("Invalid Asset Type Maps To 400", func(t *testing.T) {
-		h := newTestHandler(&fakeUserRepository{}, &fakeNoteRepository{})
-
-		req := httptest.NewRequest(http.MethodGet, "/users?asset_type=bogus&asset_id="+uuid.New().String(), nil)
-		req = authedRequest(req, uuid.New(), config.RoleUser)
-		rec := httptest.NewRecorder()
-
-		h.GetUsers(rec, req)
-
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	t.Run("Non-Admin Maps To 403", func(t *testing.T) {
+		userRepo := &fakeUserRepository{
+			listUsersFunc: func(context.Context, database.Querier) ([]dUser.User, error) {
+				t.Fatal("ListUsers should not be called for a non-admin caller")
+				return nil, nil
+			},
 		}
-	})
+		h := newTestHandler(userRepo, &fakeNoteRepository{})
 
-	t.Run("Invalid Asset ID Maps To 400", func(t *testing.T) {
-		h := newTestHandler(&fakeUserRepository{}, &fakeNoteRepository{})
-
-		req := httptest.NewRequest(http.MethodGet, "/users?asset_type=Farm&asset_id=not-a-uuid", nil)
+		req := httptest.NewRequest(http.MethodGet, "/users", nil)
 		req = authedRequest(req, uuid.New(), config.RoleUser)
 		rec := httptest.NewRecorder()
 
 		h.GetUsers(rec, req)
 
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusForbidden, rec.Body.String())
 		}
 	})
 }

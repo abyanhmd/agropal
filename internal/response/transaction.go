@@ -12,5 +12,6 @@ type TransactionResponse struct {
 	Date          time.Time `json:"date"`
 	Type          string    `json:"type"`
 	Amount        float64   `json:"amount"`
+	Currency      string    `json:"currency"`
 	Description   string    `json:"description"`
 }

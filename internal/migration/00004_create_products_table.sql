@@ -1,7 +1,7 @@
 -- +goose Up
 CREATE TABLE IF NOT EXISTS products (
     product_id UUID PRIMARY KEY,
-    farm_id UUID REFERENCES farms(farm_id),
+    farm_id UUID REFERENCES farms(farm_id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
     image TEXT

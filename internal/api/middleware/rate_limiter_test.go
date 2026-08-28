@@ -122,29 +122,97 @@ func TestRateLimiter(t *testing.T) {
 
 func TestClientIP(t *testing.T) {
 	t.Run("Strips The Port From A Host Port RemoteAddr", func(t *testing.T) {
+		mw := newTestMiddleware()
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		r.RemoteAddr = "203.0.113.10:54321"
 
-		if got := clientIP(r); got != "203.0.113.10" {
+		if got := mw.clientIP(r); got != "203.0.113.10" {
 			t.Errorf("clientIP() = %q, want %q", got, "203.0.113.10")
 		}
 	})
 
 	t.Run("Strips The Port From An IPv6 RemoteAddr", func(t *testing.T) {
+		mw := newTestMiddleware()
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		r.RemoteAddr = "[2001:db8::1]:54321"
 
-		if got := clientIP(r); got != "2001:db8::1" {
+		if got := mw.clientIP(r); got != "2001:db8::1" {
 			t.Errorf("clientIP() = %q, want %q", got, "2001:db8::1")
 		}
 	})
 
 	t.Run("Falls Back To The Raw RemoteAddr When Not Host Port Form", func(t *testing.T) {
+		mw := newTestMiddleware()
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		r.RemoteAddr = "not-a-host-port"
 
-		if got := clientIP(r); got != "not-a-host-port" {
+		if got := mw.clientIP(r); got != "not-a-host-port" {
 			t.Errorf("clientIP() = %q, want %q", got, "not-a-host-port")
+		}
+	})
+
+	t.Run("Ignores X-Forwarded-For From An Untrusted Peer", func(t *testing.T) {
+		mw := newTestMiddleware() // no trusted proxies configured
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.RemoteAddr = "203.0.113.10:54321"
+		r.Header.Set("X-Forwarded-For", "198.51.100.7")
+
+		if got := mw.clientIP(r); got != "203.0.113.10" {
+			t.Errorf("clientIP() = %q, want the peer address %q", got, "203.0.113.10")
+		}
+	})
+
+	t.Run("Trusts X-Forwarded-For From A Configured Proxy Range", func(t *testing.T) {
+		mw := newTestMiddlewareWithProxies([]string{"10.0.0.0/8"})
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.RemoteAddr = "10.1.2.3:44444"
+		r.Header.Set("X-Forwarded-For", "198.51.100.7")
+
+		if got := mw.clientIP(r); got != "198.51.100.7" {
+			t.Errorf("clientIP() = %q, want the forwarded client %q", got, "198.51.100.7")
+		}
+	})
+
+	t.Run("Walks Past Trusted Hops In X-Forwarded-For", func(t *testing.T) {
+		mw := newTestMiddlewareWithProxies([]string{"10.0.0.0/8"})
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.RemoteAddr = "10.1.2.3:44444"
+		// real client, then two internal proxy hops
+		r.Header.Set("X-Forwarded-For", "198.51.100.7, 10.9.9.9, 10.1.2.3")
+
+		if got := mw.clientIP(r); got != "198.51.100.7" {
+			t.Errorf("clientIP() = %q, want %q", got, "198.51.100.7")
+		}
+	})
+
+	t.Run("Falls Back To Peer When X-Forwarded-For Is All Trusted Hops", func(t *testing.T) {
+		mw := newTestMiddlewareWithProxies([]string{"10.0.0.0/8"})
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.RemoteAddr = "10.1.2.3:44444"
+		r.Header.Set("X-Forwarded-For", "10.9.9.9")
+
+		if got := mw.clientIP(r); got != "10.1.2.3" {
+			t.Errorf("clientIP() = %q, want peer %q", got, "10.1.2.3")
+		}
+	})
+
+	t.Run("Accepts A Bare Proxy IP", func(t *testing.T) {
+		mw := newTestMiddlewareWithProxies([]string{"192.0.2.1"})
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.RemoteAddr = "192.0.2.1:44444"
+		r.Header.Set("X-Forwarded-For", "198.51.100.7")
+
+		if got := mw.clientIP(r); got != "198.51.100.7" {
+			t.Errorf("clientIP() = %q, want %q", got, "198.51.100.7")
+		}
+	})
+}
+
+func TestParseCIDRs(t *testing.T) {
+	t.Run("Skips Unparseable Entries", func(t *testing.T) {
+		nets := parseCIDRs([]string{"", "  ", "not-an-ip", "10.0.0.0/8", "192.0.2.5"})
+		if len(nets) != 2 {
+			t.Fatalf("parseCIDRs() returned %d nets, want 2", len(nets))
 		}
 	})
 }

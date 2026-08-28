@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     amount NUMERIC(10,2) NOT NULL,
     currency VARCHAR(10) NOT NULL,
     description VARCHAR(255),
-    product_id UUID REFERENCES products(product_id)
+    product_id UUID REFERENCES products(product_id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_transactions_product_id ON transactions (product_id);

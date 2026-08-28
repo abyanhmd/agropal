@@ -10,6 +10,7 @@ type TransactionRequest struct {
 	Date        time.Time `json:"date" validate:"required"`
 	Type        string    `json:"type" validate:"required,oneof=INCOME EXPENSE"`
 	Amount      float64   `json:"amount" validate:"required,gt=0"`
+	Currency    string    `json:"currency" validate:"required,iso4217"`
 	Description string    `json:"description" validate:"max=255"`
 }
 
@@ -18,6 +19,7 @@ func (r *TransactionRequest) ToCommand() aTransaction.TransactionCommand {
 		Date:        r.Date,
 		Type:        dTransaction.TransactionType(r.Type),
 		Amount:      r.Amount,
+		Currency:    r.Currency,
 		Description: r.Description,
 	}
 }

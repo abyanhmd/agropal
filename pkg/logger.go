@@ -84,6 +84,7 @@ func (l *Logger) withFields(ctx context.Context, level zerolog.Level, asset shar
 
 func (l *Logger) addContextFields(ctx context.Context, event *zerolog.Event) {
 	keys := []shared.ContextKey{
+		shared.KeyRequestID,
 		shared.KeyMethod,
 		shared.KeyURLPath,
 		shared.KeyUserAgent,

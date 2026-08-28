@@ -118,6 +118,10 @@ type fakeAuthRepository struct {
 	deleteRefreshTokenFunc func(ctx context.Context, q database.Querier, refreshTokenID string) error
 }
 
+func (f *fakeAuthRepository) InvalidateSessions(context.Context, database.Querier, uuid.UUID) error {
+	panic("fakeAuthRepository: InvalidateSessions not stubbed")
+}
+
 func (f *fakeAuthRepository) CreateRefreshToken(ctx context.Context, q database.Querier, rt dAuth.RefreshToken) error {
 	if f.createRefreshTokenFunc == nil {
 		panic("fakeAuthRepository: createRefreshTokenFunc not stubbed")

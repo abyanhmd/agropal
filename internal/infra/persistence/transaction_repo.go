@@ -22,8 +22,12 @@ func NewTransactionRepository(l *pkg.Logger) dTransaction.Repository {
 func (r *transactionRepo) CreateTransaction(ctx context.Context, q database.Querier, t []dTransaction.Transaction) error {
 	query := `
 		INSERT INTO transactions (
-			transaction_id, transaction_date, transaction_type,
-			amount, currency, description,
+			transaction_id, 
+			transaction_date, 
+			transaction_type,
+			amount, 
+			currency, 
+			description,
 			product_id
 		) VALUES (
 			:transaction_id, :transaction_date, :transaction_type,

@@ -12,6 +12,7 @@ func DomainToTransactionResponse(t dTransaction.Transaction) response.Transactio
 		Date:          t.Date,
 		Type:          string(t.Type),
 		Amount:        t.Amount,
+		Currency:      t.Currency,
 		Description:   t.Description,
 	}
 }

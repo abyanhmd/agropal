@@ -21,6 +21,7 @@ func newTestMiddlewareWithLogger(jwt *fakeTokenProvider) *Middleware {
 	return NewMiddleware(
 		utils.NewIOHandler(logger, nil, utils.NewValidator()),
 		jwt,
+		nil,
 	)
 }
 

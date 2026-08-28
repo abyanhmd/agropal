@@ -2,12 +2,12 @@ package user
 
 import (
 	"agropal/config"
+	dAuth "agropal/internal/domain/auth"
 	dNote "agropal/internal/domain/note"
 	"agropal/internal/domain/shared"
 	dUser "agropal/internal/domain/user"
 	"agropal/internal/infra/database"
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,17 +17,20 @@ import (
 type Service struct {
 	transactor database.Transactor
 	userRepo   dUser.Repository
+	authRepo   dAuth.Repository
 	noteRepo   dNote.Repository
 }
 
 func NewService(
 	t database.Transactor,
 	ur dUser.Repository,
+	ar dAuth.Repository,
 	nr dNote.Repository,
 ) *Service {
 	return &Service{
 		transactor: t,
 		userRepo:   ur,
+		authRepo:   ar,
 		noteRepo:   nr,
 	}
 }
@@ -58,7 +61,7 @@ func (s *Service) UpdateUser(ctx context.Context, cmd UserCommand) error {
 	return s.userRepo.UpdateUser(ctx, s.transactor.DB(), cmd.ToDomain())
 }
 
-func (s *Service) UpdateUserPassword(ctx context.Context, userID uuid.UUID, password string) error {
+func (s *Service) UpdateUserPassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) error {
 	user, err := s.verifyAccess(ctx, userID)
 	if err != nil {
 		return err
@@ -67,13 +70,21 @@ func (s *Service) UpdateUserPassword(ctx context.Context, userID uuid.UUID, pass
 		userID = user.ID
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err = bcrypt.CompareHashAndPassword([]byte(user.Security.Password), []byte(oldPassword)); err != nil {
+		return shared.ErrUnauthorized
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
-	password = string(hashedPassword)
 
-	return s.userRepo.UpdateUserPassword(ctx, s.transactor.DB(), user.ID, password)
+	// Invalidate all sessions after changing password
+	if err = s.authRepo.InvalidateSessions(ctx, s.transactor.DB(), user.ID); err != nil {
+		return err
+	}
+
+	return s.userRepo.UpdateUserPassword(ctx, s.transactor.DB(), user.ID, string(hashedPassword))
 }
 
 func (s *Service) Delete(ctx context.Context, deleteType shared.DeleteType, userID uuid.UUID) error {
@@ -115,31 +126,18 @@ func (s *Service) Delete(ctx context.Context, deleteType shared.DeleteType, user
 	})
 }
 
-func (s *Service) GetUsers(ctx context.Context, assetTypeStr shared.AssetType, assetID uuid.UUID) ([]dUser.User, error) {
-	requesterID, _ := shared.ExtractUserID(ctx)
-	_, err := s.verifyAccess(ctx, requesterID)
-	if err != nil {
-		return []dUser.User{}, err
+func (s *Service) GetUsers(ctx context.Context) ([]dUser.User, error) {
+	// Admin-only: this returns every user's name/email/role with no
+	// scoping. Enforced here as well as at the route (PermGetManyUsers) so
+	// it can't be re-exposed by a router change.
+	if _, err := shared.ExtractUserID(ctx); err != nil {
+		return nil, err
+	}
+	if shared.GetMetadata(ctx, shared.KeyRole) != string(config.RoleAdmin) {
+		return nil, shared.ErrForbidden
 	}
 
-	var assetType shared.AssetType
-
-	switch assetTypeStr {
-	case shared.AssetUser:
-		assetType = shared.AssetUser
-	case shared.AssetFarm:
-		assetType = shared.AssetFarm
-	case shared.AssetProduct:
-		assetType = shared.AssetProduct
-	case shared.AssetPost:
-		assetType = shared.AssetPost
-	case shared.AssetComment:
-		assetType = shared.AssetComment
-	default:
-		return nil, errors.New("invalid asset type")
-	}
-
-	return s.userRepo.ListUsersByAsset(ctx, s.transactor.DB(), assetType, assetID)
+	return s.userRepo.ListUsers(ctx, s.transactor.DB())
 }
 
 /* ==================== Helper ====================== */

@@ -85,6 +85,8 @@ Auth uses a two-step email flow. `POST /auth/register` and `POST /auth/login` on
 
 Mutating endpoints (`POST` create, `PATCH`, `DELETE`) respond with a success envelope (`{info: {code, key, message}, data, request_id}`) instead of a bare status with no body. `key`/`message` are looked up in `response.SuccessRegistry` (`internal/response/registry_success.go`) by the domain's `SuccessKey` (e.g. `dFarm.SuccessCreated` → `"FARM.CREATE_SUCCESS"`), defined alongside each domain's error keys in `internal/domain/<domain>/entity.go`. `GET` endpoints return the raw DTO instead, and errors use the equivalent `ErrorRegistry`-backed envelope. The `/auth/*` endpoints also use the success envelope; when a token pair is issued (the `/verify` endpoints and `/auth/refresh`) it sits under the envelope's `data` field. See `docs/openapi.yaml` and `docs/README.md` for the full endpoint-by-endpoint mapping.
 
+Every request is assigned a server-generated correlation id (a UUID) by the `RequestID` middleware; any inbound `X-Request-Id` is ignored, so the backend is the sole source of truth. It is echoed on the response's `X-Request-Id` header, included as `request_id` in every envelope (success and error), and attached to the matching access-log line, so a client-reported id can be traced to a server-side log entry.
+
 Request bodies are validated with [go-playground/validator](https://github.com/go-playground/validator) via `validate` struct tags on the `internal/request` DTOs (`internal/utils/validate.go`). A handler calls `ioHandler.ValidateStruct(ctx, w, req)` right after decoding the body; on failure it writes the `COMMON.VALIDATION_FAILED` error with the envelope's `errors` field populated as `{field: [messages]}`, one entry per failing field. Endpoints with validation semantics that don't map cleanly onto struct tags (e.g. auth's email/password rules, which need specific per-rule error keys) keep their own hand-written checks in `internal/api/<domain>/mapper.go` instead.
 
 ## Getting Started
@@ -125,6 +127,10 @@ SECRET_SMTP=
 `SECRET_SMTP` is the SMTP account's password/app-password; `SMTP_USERNAME`/`SMTP_FROM` are usually the same address.
 
 Server and path settings (host, port, migration/log paths) live in `backend/config/config.yaml`.
+
+If the server runs behind a reverse proxy (the docker-compose stack puts Traefik in front of it), set `server.trusted_proxies` in `config.yaml` to the proxy's IP ranges, for example `["172.16.0.0/12"]` for the compose bridge network. Rate limiting and request logging then read the real client IP from `X-Forwarded-For` instead of keying every request to the proxy. Left empty, the connection peer address is used as-is.
+
+For browser (website) clients, list the front-end origins in `cors.allowed_origins` in `config.yaml`, for example `["https://app.example.com", "http://localhost:5173"]`. The `middleware.CORS` wrapper then answers preflight `OPTIONS` and sends `Access-Control-Allow-Origin`/`-Credentials` for those origins (credentials are on, since the auth flow uses the `rid` cookie), and exposes `X-Request-Id` to page scripts. The single entry `"*"` reflects any origin — development only. Native/mobile and server-to-server clients send no `Origin` header and are unaffected either way; an empty list simply blocks browser cross-origin calls.
 
 ### Database
 

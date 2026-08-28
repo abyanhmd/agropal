@@ -45,14 +45,16 @@ func (m *Middleware) Logger() HandlerMiddleware {
 					}
 				}
 			}
+			clientIP := m.clientIP(r)
 			ctx = shared.SaveContextFromRequest(r, claims)
+			ctx = shared.WithMetadata(ctx, shared.KeyIPAddress, clientIP)
 			r = r.WithContext(ctx)
 
 			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(rec, r)
 
 			m.ioHandler.Logger.Info(ctx, shared.System, fmt.Sprintf(
-				"%s %s -> %d (%s)", r.Method, r.URL.Path, rec.status, time.Since(start),
+				"%s %s from %s -> %d (%s)", r.Method, r.URL.Path, clientIP, rec.status, time.Since(start),
 			))
 		})
 	}

@@ -48,7 +48,8 @@ var userPermissions = []Permission{
 	PermUpdateUser,
 	PermChangeUserPassword,
 	PermDeleteUser,
-	PermGetManyUsers,
+	// PermGetManyUsers is deliberately admin-only: it lists other users
+	// (name/email/role) by related asset, so a regular user must not hold it.
 
 	PermCreateWeatherLocation,
 	PermGetWeatherLocationByFarmID,

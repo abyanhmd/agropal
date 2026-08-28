@@ -519,12 +519,13 @@ func TestService_UpdateProduct(t *testing.T) {
 			t.Errorf("note old/new = %q/%q, want %q/%q", shared.Str(notes[0].OldValue), shared.Str(notes[0].NewValue), "Old Name", "New Name")
 		}
 
-		// Locks in a currently-documented limitation (see README's Known
-		// Limitations): UpdateProduct records the audit note but saves the
-		// unmodified row it fetched, so the persisted name is still the old
-		// one even though the note claims it changed.
-		if persisted.Name != "Old Name" {
-			t.Errorf("persisted.Name = %q, want %q (UpdateProduct does not yet apply cmd fields before persisting)", persisted.Name, "Old Name")
+		// The changed field is applied to the row before it is persisted...
+		if persisted.Name != "New Name" {
+			t.Errorf("persisted.Name = %q, want %q", persisted.Name, "New Name")
+		}
+		// ...while fields the command left nil are untouched.
+		if persisted.Description != "Old Desc" || persisted.Image != "old.png" {
+			t.Errorf("persisted desc/image = %q/%q, want %q/%q", persisted.Description, persisted.Image, "Old Desc", "old.png")
 		}
 	})
 

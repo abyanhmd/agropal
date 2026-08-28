@@ -36,7 +36,11 @@ func newTestMiddleware() *Middleware {
 }
 
 func newTestMiddlewareWithJWT(jwt dAuth.TokenProvider) *Middleware {
-	return NewMiddleware(utils.NewIOHandler(nil, nil, utils.NewValidator()), jwt)
+	return NewMiddleware(utils.NewIOHandler(nil, nil, utils.NewValidator()), jwt, nil)
+}
+
+func newTestMiddlewareWithProxies(proxies []string) *Middleware {
+	return NewMiddleware(utils.NewIOHandler(nil, nil, utils.NewValidator()), nil, proxies)
 }
 
 func requestWithRole(role config.Role) *http.Request {

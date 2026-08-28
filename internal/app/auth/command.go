@@ -23,12 +23,6 @@ type LoginUserCommand struct {
 	Password string
 }
 
-type ChangePasswordCommand struct {
-	UserID      uuid.UUID
-	OldPassword string
-	NewPassword string
-}
-
 /* ==================== Mapping ====================== */
 
 func (c CreateUserCommand) ToDomain(userID uuid.UUID) dUser.User {

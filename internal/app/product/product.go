@@ -66,6 +66,8 @@ func (s *Service) UpdateProduct(ctx context.Context, farmID, productID uuid.UUID
 			updateNote.OldValue = shared.Ptr(product.Name)
 			updateNote.NewValue = cmd.Name
 			updateNotes = append(updateNotes, updateNote)
+
+			product.Name = *cmd.Name
 		}
 		if cmd.Description != nil {
 			noteID, err := uuid.NewV7()
@@ -77,6 +79,8 @@ func (s *Service) UpdateProduct(ctx context.Context, farmID, productID uuid.UUID
 			updateNote.OldValue = shared.Ptr(product.Description)
 			updateNote.NewValue = cmd.Description
 			updateNotes = append(updateNotes, updateNote)
+
+			product.Description = *cmd.Description
 		}
 		if cmd.Image != nil {
 			noteID, err := uuid.NewV7()
@@ -88,6 +92,8 @@ func (s *Service) UpdateProduct(ctx context.Context, farmID, productID uuid.UUID
 			updateNote.OldValue = shared.Ptr(product.Image)
 			updateNote.NewValue = cmd.Image
 			updateNotes = append(updateNotes, updateNote)
+
+			product.Image = *cmd.Image
 		}
 
 		if err = s.productRepo.UpdateProduct(ctx, q, product); err != nil {

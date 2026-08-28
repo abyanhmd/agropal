@@ -12,7 +12,21 @@ type Config struct {
 	Server struct {
 		Host string `yaml:"host"`
 		Port int    `yaml:"port"`
+		// TrustedProxies is a list of CIDR ranges (or bare IPs) for reverse
+		// proxies in front of the server. Requests whose peer address falls
+		// in one of these ranges have their X-Forwarded-For header trusted
+		// for client-IP resolution (rate limiting, logging). Empty means the
+		// server is exposed directly and the connection peer address is used
+		// as-is.
+		TrustedProxies []string `mapstructure:"trusted_proxies" yaml:"trusted_proxies"`
 	} `yaml:"server"`
+	Cors struct {
+		// AllowedOrigins are the browser origins (scheme+host+port) permitted
+		// to call the API with credentials. "*" reflects any origin (dev
+		// only). Empty blocks all browser cross-origin calls; native/mobile
+		// and server-to-server clients send no Origin and are unaffected.
+		AllowedOrigins []string `mapstructure:"allowed_origins" yaml:"allowed_origins"`
+	} `mapstructure:"cors" yaml:"cors"`
 	Path struct {
 		Migration string `yaml:"migration"`
 		Log       string `yaml:"log"`

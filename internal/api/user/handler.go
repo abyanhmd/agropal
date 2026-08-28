@@ -11,7 +11,6 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type Handler struct {
@@ -70,9 +69,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	h.ioHandler.WriteSuccess(ctx, w, dUser.SuccessUpdated, nil)
 }
 
-// ChangePassword verifies the caller's current password before delegating
-// to UserService.UpdateUserPassword, since that use case only accepts the
-// new password and trusts the caller to have already authenticated it.
+// ChangePassword validates the new password's strength here; the service
+// verifies the supplied current password, re-hashes, and revokes existing
+// sessions.
 func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -95,18 +94,7 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.userService.GetByID(ctx, userID)
-	if err != nil {
-		h.ioHandler.HandleServiceError(ctx, w, err)
-		return
-	}
-
-	if err = bcrypt.CompareHashAndPassword([]byte(user.Security.Password), []byte(req.OldPassword)); err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrUnauthorized, nil)
-		return
-	}
-
-	if err = h.userService.UpdateUserPassword(ctx, user.ID, req.NewPassword); err != nil {
+	if err = h.userService.UpdateUserPassword(ctx, userID, req.OldPassword, req.NewPassword); err != nil {
 		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
@@ -145,30 +133,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var assetType shared.AssetType
-	switch r.URL.Query().Get("asset_type") {
-	case string(shared.AssetUser):
-		assetType = shared.AssetUser
-	case string(shared.AssetFarm):
-		assetType = shared.AssetFarm
-	case string(shared.AssetProduct):
-		assetType = shared.AssetProduct
-	case string(shared.AssetPost):
-		assetType = shared.AssetPost
-	case string(shared.AssetComment):
-		assetType = shared.AssetComment
-	default:
-		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
-		return
-	}
-
-	assetID, err := uuid.Parse(r.URL.Query().Get("asset_id"))
-	if err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrInvalidRequest, nil)
-		return
-	}
-
-	users, err := h.userService.GetUsers(ctx, assetType, assetID)
+	users, err := h.userService.GetUsers(ctx)
 	if err != nil {
 		h.ioHandler.HandleServiceError(ctx, w, err)
 		return

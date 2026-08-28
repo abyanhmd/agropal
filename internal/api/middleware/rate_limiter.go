@@ -4,6 +4,7 @@ import (
 	"agropal/internal/domain/shared"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,7 +37,7 @@ func (m *Middleware) RateLimiter(rps int, burst int) func(http.Handler) http.Han
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := clientIP(r)
+			ip := m.clientIP(r)
 
 			mu.Lock()
 			v, ok := visitors[ip]
@@ -58,13 +59,47 @@ func (m *Middleware) RateLimiter(rps int, burst int) func(http.Handler) http.Han
 	}
 }
 
-// clientIP extracts the request's IP address, stripping the ephemeral port
-// on r.RemoteAddr so repeat connections from the same client key to the
-// same limiter. Falls back to the raw value if it isn't in host:port form.
-func clientIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
+// clientIP returns the address to key rate limiting (and logging) on.
+//
+// The connection peer address (r.RemoteAddr, minus its ephemeral port) is
+// used directly, unless that peer is a configured trusted proxy: in that
+// case X-Forwarded-For is walked right-to-left and the first entry that is
+// not itself a trusted proxy is returned, i.e. the address the outermost
+// trusted proxy saw the request come from. Without this, every request
+// behind a reverse proxy keys to the proxy's IP and shares one budget.
+func (m *Middleware) clientIP(r *http.Request) string {
+	peer := hostOnly(r.RemoteAddr)
+
+	if !m.isTrustedProxy(peer) {
+		return peer
+	}
+
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded == "" {
+		return peer
+	}
+
+	parts := strings.Split(forwarded, ",")
+	for i := len(parts) - 1; i >= 0; i-- {
+		candidate := strings.TrimSpace(parts[i])
+		if candidate == "" {
+			continue
+		}
+		if !m.isTrustedProxy(candidate) {
+			return candidate
+		}
+	}
+
+	return peer
+}
+
+// hostOnly strips the ephemeral port from a host:port address so repeat
+// connections from the same client key to the same limiter. It returns the
+// raw value if it isn't in host:port form.
+func hostOnly(remoteAddr string) string {
+	host, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		return remoteAddr
 	}
 	return host
 }

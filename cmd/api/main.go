@@ -69,13 +69,16 @@ func main() {
 
 	/* HTTP */
 	ioHandler := utils.NewIOHandler(logger, nil, utils.NewValidator())
-	mw := middleware.NewMiddleware(ioHandler, container.JWT)
+	mw := middleware.NewMiddleware(ioHandler, container.JWT, cfg.Server.TrustedProxies)
 
 	mux := http.NewServeMux()
 
-	// Logger runs on every request; RequireAuth only guards protected routes.
-	publicStack := middleware.CreateStack(mw.Logger(), mw.RateLimiter(5, 10))
-	protectedStack := middleware.CreateStack(mw.Logger(), mw.RateLimiter(5, 10), mw.RequireAuth)
+	// RequestID runs outermost so the correlation id reaches every layer
+	// below (Recover included); Recover then catches panics in Logger/
+	// RateLimiter; Logger runs on every request; RequireAuth only guards
+	// protected routes.
+	publicStack := middleware.CreateStack(mw.RequestID, mw.Recover, mw.Logger(), mw.RateLimiter(5, 10))
+	protectedStack := middleware.CreateStack(mw.RequestID, mw.Recover, mw.Logger(), mw.RateLimiter(5, 10), mw.RequireAuth)
 
 	// Auth endpoints are unauthenticated by definition.
 	authHandler := interfaceAuth.NewHandler(ioHandler, container.Auth.Service)
@@ -98,8 +101,11 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	srv := &http.Server{
-		Addr:    addr,
-		Handler: mux,
+		Addr: addr,
+		// CORS wraps the whole mux so it also covers the preflight OPTIONS
+		// for the method-pattern auth routes, which ServeMux would otherwise
+		// answer with a bare 405.
+		Handler: middleware.CORS(cfg.Cors.AllowedOrigins)(mux),
 	}
 
 	go func() {

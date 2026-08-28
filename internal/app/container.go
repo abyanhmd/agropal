@@ -119,7 +119,7 @@ func NewContainer(
 	/* Service */
 
 	authService := aAuth.NewService(t.Logger, transactor, generator, jwt, t.Redis, t.Queue, authRepo, userRepo)
-	userService := aUser.NewService(transactor, userRepo, noteRepo)
+	userService := aUser.NewService(transactor, userRepo, authRepo, noteRepo)
 	farmService := aFarm.NewService(transactor, userRepo, farmRepo)
 	weatherService := aWeather.NewService(transactor, userRepo, farmRepo, weatherRepo)
 	productService := aProduct.NewService(transactor, userRepo, farmRepo, productRepo, noteRepo)
