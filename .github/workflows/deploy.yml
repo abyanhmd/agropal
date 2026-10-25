@@ -1,0 +1,39 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "**.txt", "docs/**"]
+  workflow_dispatch:
+
+# Never run two deploys at once, and let a running one finish
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            cd ~/agropal
+            git fetch origin main
+            git reset --hard origin/main
+
+            # One image at a time: building the Go and Next.js images together can run a small server out of memory
+            export COMPOSE_PARALLEL_LIMIT=1
+            docker compose -f docker-compose.prod.yaml build
+            docker compose -f docker-compose.prod.yaml up -d
+
+            docker image prune -f
+            docker compose -f docker-compose.prod.yaml ps
