@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+  <!-- "A" from Unbounded SemiBold (600), matching the wordmark; colors are the accent and accent-foreground tokens -->
+  <rect width="1000" height="1000" rx="220" fill="#8cb88e"/>
+  <path transform="translate(198.7 740) scale(0.64 -0.64)" fill="#14301a" d="M208 151V304H726V151ZM594 750 940 0H739L442 671H500L204 0H2L349 750Z"/>
+</svg>

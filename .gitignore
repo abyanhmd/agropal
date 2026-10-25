@@ -1,0 +1,18 @@
+# Real environment files; the *.example templates are committed
+.env
+.env.*
+!.env.example
+!.env.prod.example
+
+# Editor / tooling state
+.idea/
+.vscode/
+.claude/
+
+# Build output
+*.exe
+*.tsbuildinfo
+node_modules/
+.next/
+logs/
+.DS_Store

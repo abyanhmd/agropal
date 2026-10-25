@@ -1,0 +1,193 @@
+@import "tailwindcss";
+
+/* Make `dark:` utilities follow the theme toggle instead of only the OS setting */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* Neutrals (slightly green-tinted to sit with the accent) */
+  --muted: #f4f6f3;
+  --muted-foreground: #66706a;
+  --border: #e2e7e1;
+
+  /* Accent — brand color, used for buttons / primary actions */
+  --accent: #8cb88e;
+  --accent-hover: #7aa87c;
+  --accent-active: #699a6c;
+  --accent-foreground: #14301a; /* text on accent bg */
+  --accent-muted: #e8f1e8;      /* soft accent bg (badges, highlights) */
+  --accent-strong: #4a7a4d;     /* accent-colored text on light bg */
+
+  /* Danger — terracotta red */
+  --danger: #c8594a;
+  --danger-hover: #b54c3e;
+  --danger-foreground: #ffffff;
+  --danger-muted: #f8e6e3;
+  --danger-strong: #a8432f;
+
+  /* Warning — wheat yellow */
+  --warning: #e0a93b;
+  --warning-hover: #cc972d;
+  --warning-foreground: #3a2a06;
+  --warning-muted: #fbf1dc;
+  --warning-strong: #9a6b12;
+
+  /* Info — dusty blue */
+  --info: #5b8fb0;
+  --info-hover: #4c7f9f;
+  --info-foreground: #ffffff;
+  --info-muted: #e4eef4;
+  --info-strong: #3f6f8f;
+
+  /* Sidebar — soft green-grey surface, accent for the active item */
+  --sidebar: #f6f8f5;
+  --sidebar-foreground: #2b332d;
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: var(--accent-foreground);
+  --sidebar-accent: var(--accent-muted);
+  --sidebar-accent-foreground: #2f5a33;
+  --sidebar-border: #e2e7e1;
+  --sidebar-ring: var(--accent);
+
+  /* Chart marks: stock in / stock out. Validated for color-blind separation (dataviz validator);
+     the light orange is below 3:1 on white, so charts using it must also offer a table view */
+  --chart-in: #357f4a;
+  --chart-out: #f0a04b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-active: var(--accent-active);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-muted: var(--accent-muted);
+  --color-accent-strong: var(--accent-strong);
+
+  /* Buttons use the accent */
+  --color-primary: var(--accent);
+  --color-primary-hover: var(--accent-hover);
+  --color-primary-active: var(--accent-active);
+  --color-primary-foreground: var(--accent-foreground);
+
+  /* Success is the accent, so INCOME/positive states stay on-brand */
+  --color-success: var(--accent);
+  --color-success-foreground: var(--accent-foreground);
+  --color-success-muted: var(--accent-muted);
+  --color-success-strong: var(--accent-strong);
+
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-muted: var(--danger-muted);
+  --color-danger-strong: var(--danger-strong);
+
+  --color-warning: var(--warning);
+  --color-warning-hover: var(--warning-hover);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-muted: var(--warning-muted);
+  --color-warning-strong: var(--warning-strong);
+
+  --color-info: var(--info);
+  --color-info-hover: var(--info-hover);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-muted: var(--info-muted);
+  --color-info-strong: var(--info-strong);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Names the shadcn/ui components expect, mapped onto the palette above */
+  --color-secondary: var(--muted);
+  --color-secondary-foreground: var(--foreground);
+  --color-destructive: var(--danger);
+  --color-popover: var(--background);
+  --color-popover-foreground: var(--foreground);
+  --color-input: var(--border);
+  --color-ring: var(--accent);
+
+  --color-chart-in: var(--chart-in);
+  --color-chart-out: var(--chart-out);
+
+  /*--font-sans: var(--font-geist-sans);*/
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-serif);
+  --font-logo: var(--font-logo);
+}
+
+/* Dark theme: toggled by next-themes via the "dark" class on <html> */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+
+  --muted: #161816;
+  --muted-foreground: #9aa39c;
+  --border: #262a26;
+
+  --accent: #8cb88e;
+  --accent-hover: #9cc49e;
+  --accent-active: #accfae;
+  --accent-foreground: #0f2213;
+  --accent-muted: #1c2a1d;
+  --accent-strong: #a8d0aa;
+
+  --danger: #d9685a;
+  --danger-hover: #e27a6d;
+  --danger-foreground: #ffffff;
+  --danger-muted: #3a1d19;
+  --danger-strong: #f08a7c;
+
+  --warning: #e6b24a;
+  --warning-hover: #edc062;
+  --warning-foreground: #2e2105;
+  --warning-muted: #3a2e14;
+  --warning-strong: #f0c66b;
+
+  --info: #6c9dbd;
+  --info-hover: #7eabc8;
+  --info-foreground: #0d1a22;
+  --info-muted: #16242e;
+  --info-strong: #8fbcd8;
+
+  --sidebar: #101210;
+  --sidebar-foreground: #e3e7e3;
+  --sidebar-accent: #1c2a1d;
+  --sidebar-accent-foreground: #a8d0aa;
+  --sidebar-border: #232823;
+
+  --chart-in: #2b7549;
+  --chart-out: #d07d2c;
+}
+
+/* Always reserve the scrollbar's width, so content doesn't shift sideways when a page
+   becomes long enough to scroll (or when a dialog locks scrolling) */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Shared width for every page's content, so switching pages doesn't change the column */
+@utility page-container {
+  @apply mx-auto w-full max-w-6xl p-4;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  /*font-family: Arial, Helvetica, sans-serif;*/
+}

@@ -1,0 +1,141 @@
+# Single-server production stack: Caddy (HTTPS) in front of the frontend and the Go API, plus
+# Postgres, Redis and RabbitMQ. Only Caddy publishes ports; nothing else is reachable from outside.
+# Unlike docker-compose.yaml there is no mail catcher, so SMTP_* must point at a real provider.
+#
+#   cp .env.prod.example .env      # fill in every value
+#   docker compose -f docker-compose.prod.yaml up -d --build
+
+name: agropal
+
+x-backend-env: &backend-env
+  ENV: docker
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is not set in .env}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set in .env}
+  POSTGRES_NAME: ${POSTGRES_NAME:-agropal}
+  REDIS_ADDRESS: redis:6379
+  REDIS_PASSWORD: ""
+  REDIS_DB: "0"
+  REDIS_PROTOCOL: "3"
+  RABBITMQ_ADDRESS: rabbitmq:5672
+  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:?RABBITMQ_USERNAME is not set in .env}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is not set in .env}
+  SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is not set in .env}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USERNAME: ${SMTP_USERNAME:?SMTP_USERNAME is not set in .env}
+  SMTP_FROM: ${SMTP_FROM:?SMTP_FROM is not set in .env}
+  SECRET_JWT: ${SECRET_JWT:?SECRET_JWT is not set in .env}
+  SECRET_GCM_TOKEN: ${SECRET_GCM_TOKEN:?SECRET_GCM_TOKEN is not set in .env}
+  SECRET_SMTP: ${SECRET_SMTP:?SECRET_SMTP is not set in .env}
+  # Never on in production: it would let anyone verify an email address they do not own
+  EXPOSE_CODES: "false"
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is not set in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - api
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the browser bundle; same origin as the app, routed to the API by Caddy
+        NEXT_PUBLIC_API_URL: https://${DOMAIN:?DOMAIN is not set in .env}/api/v1
+        NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: cmd/api/Dockerfile
+    restart: unless-stopped
+    environment: *backend-env
+    volumes:
+      - ./deploy/config.prod.yaml:/app/config/config.yaml:ro
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: cmd/migration/Dockerfile
+    restart: "no"
+    environment: *backend-env
+    volumes:
+      - ./deploy/config.prod.yaml:/app/config/config.yaml:ro
+      - ./backend/internal/migration:/app/internal/migration:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  email-worker:
+    build:
+      context: ./backend
+      dockerfile: cmd/email/Dockerfile
+    restart: unless-stopped
+    environment: *backend-env
+    volumes:
+      - ./deploy/config.prod.yaml:/app/config/config.yaml:ro
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is not set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set in .env}
+      POSTGRES_DB: ${POSTGRES_NAME:-agropal}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.12-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:?RABBITMQ_USERNAME is not set in .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is not set in .env}
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:
+  rabbitmqdata:
+  caddy_data:
+  caddy_config:

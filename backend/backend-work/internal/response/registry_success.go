@@ -1,0 +1,75 @@
+package response
+
+import (
+	dAuth "agropal/internal/domain/auth"
+	dFarm "agropal/internal/domain/farm"
+	dLocation "agropal/internal/domain/location"
+	dNote "agropal/internal/domain/note"
+	dPost "agropal/internal/domain/post"
+	dProduct "agropal/internal/domain/product"
+	"agropal/internal/domain/shared"
+	dTransaction "agropal/internal/domain/transaction"
+	dUser "agropal/internal/domain/user"
+)
+
+var SuccessRegistry = map[shared.SuccessKey]ResponseDetail{
+	// COMMON
+	shared.SuccessFileExported: {HTTPCode: 200, Message: "The file was exported successfully."}, // "COMMON.FILE_EXPORTED"
+
+	// AUTH
+	dAuth.SuccessRegister:           {HTTPCode: 201, Message: "Registration successful."},             // "AUTH.REGISTER_SUCCESS"
+	dAuth.SuccessLogin:              {HTTPCode: 200, Message: "Login successful."},                    // "AUTH.LOGIN_SUCCESS"
+	dAuth.SuccessLogout:             {HTTPCode: 200, Message: "Logout successful."},                   // "AUTH.LOGOUT_SUCCESS"
+	dAuth.SuccessRefresh:            {HTTPCode: 200, Message: "Token refreshed successfully."},        // "AUTH.REFRESH_SUCCESS"
+	dAuth.SuccessVerificationSent:   {HTTPCode: 200, Message: "A verification code has been sent."},   // "AUTH.VERIFICATION_CODE_SENT"
+	dAuth.SuccessEmailVerified:      {HTTPCode: 200, Message: "Email verified successfully."},         // "AUTH.EMAIL_VERIFIED"
+	dAuth.SuccessPasswordResetEmail: {HTTPCode: 200, Message: "A password reset code has been sent."}, // "AUTH.PASSWORD_RESET_EMAIL_SENT"
+	dAuth.SuccessPasswordReset:      {HTTPCode: 200, Message: "Password reset successfully."},         // "AUTH.PASSWORD_RESET_SUCCESS"
+
+	// FARM
+	dFarm.SuccessCreated: {HTTPCode: 201, Message: "The farm was created successfully."}, // "FARM.CREATE_SUCCESS"
+	dFarm.SuccessUpdated: {HTTPCode: 200, Message: "The farm was updated successfully."}, // "FARM.UPDATE_SUCCESS"
+	dFarm.SuccessDeleted: {HTTPCode: 200, Message: "The farm was deleted successfully."}, // "FARM.DELETE_SUCCESS"
+
+	// NOTE
+	dNote.SuccessCreated: {HTTPCode: 201, Message: "The note was created successfully."}, // "NOTE.CREATE_SUCCESS"
+	dNote.SuccessUpdated: {HTTPCode: 200, Message: "The note was updated successfully."}, // "NOTE.UPDATE_SUCCESS"
+	dNote.SuccessDeleted: {HTTPCode: 200, Message: "The note was deleted successfully."}, // "NOTE.DELETE_SUCCESS"
+
+	// POST
+	dPost.SuccessCreated: {HTTPCode: 201, Message: "The post was created successfully."}, // "POST.CREATE_SUCCESS"
+	dPost.SuccessUpdated: {HTTPCode: 200, Message: "The post was updated successfully."}, // "POST.UPDATE_SUCCESS"
+	dPost.SuccessDeleted: {HTTPCode: 200, Message: "The post was deleted successfully."}, // "POST.DELETE_SUCCESS"
+
+	dPost.SuccessCommentCreated: {HTTPCode: 201, Message: "The comment was created successfully."}, // "POST.COMMENT_CREATE_SUCCESS"
+	dPost.SuccessCommentUpdated: {HTTPCode: 200, Message: "The comment was updated successfully."}, // "POST.COMMENT_UPDATE_SUCCESS"
+	dPost.SuccessCommentDeleted: {HTTPCode: 200, Message: "The comment was deleted successfully."}, // "POST.COMMENT_DELETE_SUCCESS"
+
+	dPost.SuccessEngagementCreated: {HTTPCode: 201, Message: "The engagement was recorded successfully."}, // "POST.ENGAGEMENT_CREATE_SUCCESS"
+	dPost.SuccessEngagementDeleted: {HTTPCode: 200, Message: "The reaction was removed successfully."},   // "POST.ENGAGEMENT_DELETE_SUCCESS"
+
+	// PRODUCT
+	dProduct.SuccessCreated: {HTTPCode: 201, Message: "The product was created successfully."}, // "PRODUCT.CREATE_SUCCESS"
+	dProduct.SuccessUpdated: {HTTPCode: 200, Message: "The product was updated successfully."}, // "PRODUCT.UPDATE_SUCCESS"
+	dProduct.SuccessDeleted: {HTTPCode: 200, Message: "The product was deleted successfully."}, // "PRODUCT.DELETE_SUCCESS"
+
+	dProduct.SuccessStockAdded:   {HTTPCode: 201, Message: "The stock movement was recorded successfully."}, // "PRODUCT.STOCK_ADD_SUCCESS"
+	dProduct.SuccessStockDeleted: {HTTPCode: 200, Message: "The stock movement was deleted successfully."},  // "PRODUCT.STOCK_DELETE_SUCCESS"
+
+	dProduct.SuccessPriceAdded:   {HTTPCode: 201, Message: "The price was added successfully."},   // "PRODUCT.PRICE_ADD_SUCCESS"
+	dProduct.SuccessPriceDeleted: {HTTPCode: 200, Message: "The price was deleted successfully."}, // "PRODUCT.PRICE_DELETE_SUCCESS"
+
+	// TRANSACTION
+	dTransaction.SuccessCreated: {HTTPCode: 201, Message: "The transaction was created successfully."}, // "TRANSACTION.CREATE_SUCCESS"
+	dTransaction.SuccessUpdated: {HTTPCode: 200, Message: "The transaction was updated successfully."}, // "TRANSACTION.UPDATE_SUCCESS"
+	dTransaction.SuccessDeleted: {HTTPCode: 200, Message: "The transaction was deleted successfully."}, // "TRANSACTION.DELETE_SUCCESS"
+
+	// USER
+	dUser.SuccessUpdated: {HTTPCode: 200, Message: "The user was updated successfully."}, // "USER.UPDATE_SUCCESS"
+	dUser.SuccessDeleted: {HTTPCode: 200, Message: "The user was deleted successfully."}, // "USER.DELETE_SUCCESS"
+
+	// LOCATION
+	dLocation.SuccessCreated: {HTTPCode: 201, Message: "The location was created successfully."}, // "LOCATION.CREATE_SUCCESS"
+	dLocation.SuccessUpdated: {HTTPCode: 200, Message: "The location was updated successfully."}, // "LOCATION.UPDATE_SUCCESS"
+	dLocation.SuccessDeleted: {HTTPCode: 200, Message: "The location was deleted successfully."}, // "LOCATION.DELETE_SUCCESS"
+}

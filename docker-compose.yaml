@@ -1,0 +1,143 @@
+# Runs the whole of Agropal: the Go API (plus its email worker and migrations), the Next.js
+# frontend, and what they depend on (Postgres, Redis, RabbitMQ), with a mail catcher standing in
+# for a real SMTP provider.
+#
+#   cp .env.example .env
+#   docker compose up --build
+#
+# Then open http://localhost:3000. Sign-in codes arrive in the mail catcher at http://localhost:8025.
+
+name: agropal
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Written into the browser bundle at build time, and called from the browser, so this is
+        # the API's address as seen from your machine, not from inside the compose network.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api/v1}
+        NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: cmd/api/Dockerfile
+    restart: unless-stopped
+    environment: &backend-env
+      # Any value stops the app from looking for a .env file inside the container
+      ENV: docker
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is not set - copy .env.example to .env next to this file}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set - copy .env.example to .env next to this file}
+      POSTGRES_NAME: ${POSTGRES_NAME:-${POSTGRES_DB:-agropal}}
+      REDIS_ADDRESS: redis:6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: "0"
+      REDIS_PROTOCOL: "3"
+      RABBITMQ_ADDRESS: rabbitmq:5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:?RABBITMQ_USERNAME is not set - copy .env.example to .env next to this file}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is not set - copy .env.example to .env next to this file}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_FROM: ${SMTP_FROM:-agropal@example.com}
+      SECRET_JWT: ${SECRET_JWT:?SECRET_JWT is not set - copy .env.example to .env next to this file}
+      SECRET_GCM_TOKEN: ${SECRET_GCM_TOKEN:?SECRET_GCM_TOKEN is not set - copy .env.example to .env next to this file}
+      SECRET_SMTP: ${SECRET_SMTP:-}
+      EXPOSE_CODES: ${EXPOSE_CODES:-false}
+    ports:
+      - "8080:8080"
+    volumes:
+      # Browser origins allowed to call the API are set in config/config.yaml (cors.allowed_origins)
+      - ./backend/config:/app/config:ro
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  # Applies the database migrations and exits
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: cmd/migration/Dockerfile
+    restart: "no"
+    environment: *backend-env
+    volumes:
+      - ./backend/config:/app/config:ro
+      - ./backend/internal/migration:/app/internal/migration:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # Sends the sign-in and password-reset codes
+  email-worker:
+    build:
+      context: ./backend
+      dockerfile: cmd/email/Dockerfile
+    restart: unless-stopped
+    environment: *backend-env
+    volumes:
+      - ./backend/config:/app/config:ro
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      mailpit: { condition: service_started }
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is not set - copy .env.example to .env next to this file}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set - copy .env.example to .env next to this file}
+      POSTGRES_DB: ${POSTGRES_NAME:-${POSTGRES_DB:-agropal}}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.12-alpine
+    restart: unless-stopped
+    environment:
+      # The built-in guest account only works from the same machine, so make a real one
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:?RABBITMQ_USERNAME is not set - copy .env.example to .env next to this file}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is not set - copy .env.example to .env next to this file}
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # Catches the emails the worker sends, so nothing real goes out. Browse them at http://localhost:8025.
+  # For real email, point SMTP_* in .env at your provider and remove this service.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+
+volumes:
+  pgdata:
+  redisdata:
+  rabbitmqdata:

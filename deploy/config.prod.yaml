@@ -1,0 +1,14 @@
+# Mounted over backend/config/config.yaml by docker-compose.prod.yaml
+stage: "prod"
+server:
+  host: "0.0.0.0"
+  port: 8080
+  # Caddy reaches the API over the compose bridge network, so trust X-Forwarded-For from there.
+  # Without this every visitor shares the proxy's IP, and with it one rate-limit budget.
+  trusted_proxies: ["172.16.0.0/12"]
+cors:
+  # The app and API share one origin behind Caddy, so no cross-origin browser calls are allowed
+  allowed_origins: []
+path:
+  migration: "internal/migration"
+  log: "logs"
