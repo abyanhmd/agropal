@@ -1,13 +1,18 @@
-name: CI
+name: Backend CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
+    paths: ["backend/**", ".github/workflows/backend.yml"]
   pull_request:
-    branches: [master]
+    paths: ["backend/**", ".github/workflows/backend.yml"]
 
 permissions:
   contents: read
+
+defaults:
+  run:
+    working-directory: backend
 
 jobs:
   test:
@@ -20,8 +25,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
-          cache: true
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
 
       - name: Build
         run: go build ./...
@@ -38,6 +43,7 @@ jobs:
             exit 1
           fi
 
+      # The integration tests start Postgres, Redis and RabbitMQ with testcontainers; the runner has Docker
       - name: Test
         run: go test ./... -race -count=1 -coverprofile=coverage.out
 
