@@ -14,6 +14,7 @@ var (
 	ErrInvalidAuthorID   shared.ErrorKey = "POST.INVALID_AUTHOR_ID"
 	ErrInvalidAssetType  shared.ErrorKey = "POST.INVALID_ASSET_TYPE"
 	ErrInvalidActionType shared.ErrorKey = "POST.INVALID_ACTION_TYPE"
+	ErrInvalidSort       shared.ErrorKey = "POST.INVALID_SORT"
 
 	ErrCreateFailed shared.ErrorKey = "POST.CREATE_FAILED"
 	ErrUpdateFailed shared.ErrorKey = "POST.UPDATE_FAILED"

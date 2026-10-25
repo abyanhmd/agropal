@@ -37,21 +37,28 @@ func NewService(
 	}
 }
 
-func (s *Service) Create(ctx context.Context, farmID, productID uuid.UUID, cmd []TransactionCommand) error {
+// Create returns the new transactions' ids, in the order of cmd
+func (s *Service) Create(ctx context.Context, farmID, productID uuid.UUID, cmd []TransactionCommand) ([]uuid.UUID, error) {
 	if err := s.verifyProduct(ctx, farmID, productID); err != nil {
-		return err
+		return nil, err
 	}
 
 	transactions := make([]dTransaction.Transaction, len(cmd))
+	ids := make([]uuid.UUID, len(cmd))
 	for i, c := range cmd {
 		transactionID, err := uuid.NewV7()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		transactions[i] = c.ToDomain(productID, transactionID)
+		ids[i] = transactionID
 	}
 
-	return s.transactionRepo.CreateTransaction(ctx, s.transactor.DB(), transactions)
+	if err := s.transactionRepo.CreateTransaction(ctx, s.transactor.DB(), transactions); err != nil {
+		return nil, err
+	}
+
+	return ids, nil
 }
 
 func (s *Service) GetOne(ctx context.Context, farmID, productID, transactionID uuid.UUID) (dTransaction.Transaction, error) {

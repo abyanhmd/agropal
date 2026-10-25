@@ -51,10 +51,10 @@ var userPermissions = []Permission{
 	// PermGetManyUsers is deliberately admin-only: it lists other users
 	// (name/email/role) by related asset, so a regular user must not hold it.
 
-	PermCreateWeatherLocation,
-	PermGetWeatherLocationByFarmID,
-	PermUpdateWeatherLocation,
-	PermDeleteWeatherLocation,
+	PermCreateLocation,
+	PermGetLocationByFarmID,
+	PermUpdateLocation,
+	PermDeleteLocation,
 }
 
 var guestPermissions = []Permission{
@@ -67,7 +67,7 @@ var guestPermissions = []Permission{
 	PermGetOneProduct,
 	PermGetManyProducts,
 
-	PermGetWeatherLocationByFarmID,
+	PermGetLocationByFarmID,
 }
 
 // RolePermissions maps each role to the permissions it holds. RoleAdmin is
@@ -95,8 +95,8 @@ func init() {
 
 		PermGetUserByID, PermUpdateUser, PermChangeUserPassword, PermDeleteUser, PermGetManyUsers,
 
-		PermCreateWeatherLocation, PermGetWeatherLocationByFarmID,
-		PermUpdateWeatherLocation, PermDeleteWeatherLocation,
+		PermCreateLocation, PermGetLocationByFarmID,
+		PermUpdateLocation, PermDeleteLocation,
 	}
 
 	RolePermissions[RoleAdmin] = allPermissions

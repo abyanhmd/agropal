@@ -27,7 +27,7 @@ security:
 tags:
   - name: Auth
   - name: Farm
-  - name: Weather
+  - name: Location
   - name: Product
   - name: Transaction
   - name: User
@@ -92,6 +92,9 @@ paths:
     post:
       tags: [Auth]
       summary: Check credentials and email a login code
+      description: |
+        Identify the account with `email` or with `username`, not both (400 if both are sent). An unknown
+        account and a wrong password give the same `AUTH.INVALID_CREDENTIALS` answer.
       description: Verifies email-or-username + password, then emails a one-time code. No token is issued here — call `/auth/login/verify` with the code.
       security: []
       requestBody:
@@ -292,7 +295,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessEnvelope'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FarmCreated'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -366,65 +374,70 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /farm/{farm_id}/weather:
+  /farm/{farm_id}/location:
     parameters:
       - $ref: '#/components/parameters/FarmId'
     post:
-      tags: [Weather]
-      summary: Create weather location for a farm
+      tags: [Location]
+      summary: Create a location for a farm
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/WeatherRequest'
+              $ref: '#/components/schemas/LocationRequest'
       responses:
         '201':
-          description: Weather record created
+          description: Location created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessEnvelope'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationCreated'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
     get:
-      tags: [Weather]
-      summary: List weather records for a farm
+      tags: [Location]
+      summary: List location for a farm
       responses:
         '200':
-          description: List of weather records
+          description: List of location
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/WeatherResponse'
+                  $ref: '#/components/schemas/LocationResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /farm/{farm_id}/weather/{weather_id}:
+  /farm/{farm_id}/location/{location_id}:
     parameters:
       - $ref: '#/components/parameters/FarmId'
-      - name: weather_id
+      - name: location_id
         in: path
         required: true
         schema:
           type: string
           format: uuid
     patch:
-      tags: [Weather]
-      summary: Update a weather record
+      tags: [Location]
+      summary: Update a location
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/WeatherRequest'
+              $ref: '#/components/schemas/LocationRequest'
       responses:
         '200':
-          description: Weather record updated
+          description: Location updated
           content:
             application/json:
               schema:
@@ -436,11 +449,11 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
-      tags: [Weather]
-      summary: Delete a weather record
+      tags: [Location]
+      summary: Delete a location
       responses:
         '200':
-          description: Weather record deleted
+          description: Location deleted
           content:
             application/json:
               schema:
@@ -468,7 +481,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessEnvelope'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProductCreated'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -562,7 +580,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessEnvelope'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PriceCreated'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -612,7 +635,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessEnvelope'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/StockCreated'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -680,7 +708,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessEnvelope'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TransactionsCreated'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -938,7 +971,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessEnvelope'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PostCreated'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -949,15 +987,27 @@ paths:
       parameters:
         - name: slug
           in: query
+          description: Matches posts whose slug contains this text
+          schema:
+            type: string
+        - name: q
+          in: query
+          description: Matches posts whose title or content contains this text, ignoring case
           schema:
             type: string
         - name: user_id
           in: query
+          description: Only posts by this author. Repeat the parameter to allow several authors.
+          style: form
+          explode: true
           schema:
-            type: string
-            format: uuid
+            type: array
+            items:
+              type: string
+              format: uuid
         - name: limit
           in: query
+          description: Page size. Defaults to 20 and is capped at 100 when `limit` or `offset` is sent.
           schema:
             type: integer
         - name: offset
@@ -966,8 +1016,10 @@ paths:
             type: integer
         - name: sort_column
           in: query
+          description: Needs `sort_dir` as well. Defaults to newest first.
           schema:
             type: string
+            enum: [created_at, updated_at, title, like_count, dislike_count, view_count, comment_count]
         - name: sort_dir
           in: query
           schema:
@@ -976,12 +1028,36 @@ paths:
       responses:
         '200':
           description: List of posts
+          headers:
+            X-Total-Count:
+              description: How many posts match the filters, ignoring `limit` and `offset`
+              schema:
+                type: integer
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/PostResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /post/authors:
+    get:
+      tags: [Post]
+      summary: List everyone who has written a post
+      description: For building an author filter. Only names are exposed.
+      responses:
+        '200':
+          description: Authors, sorted by name
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostAuthorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -991,6 +1067,7 @@ paths:
     get:
       tags: [Post]
       summary: Get a post with its comments
+      description: Every comment on the post, replies included, oldest first. Replies point at their parent through `parent_id`.
       responses:
         '200':
           description: Post detail
@@ -1021,7 +1098,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessEnvelope'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CommentCreated'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1032,7 +1114,10 @@ paths:
       - $ref: '#/components/parameters/PostId'
     post:
       tags: [Post]
-      summary: Like/dislike/view a post
+      summary: Like, dislike or view a post
+      description: |
+        A user has at most one like or dislike per post: sending the other one switches it, and sending
+        the same one again changes nothing. Views are not reactions; each one is counted.
       requestBody:
         required: true
         content:
@@ -1042,6 +1127,25 @@ paths:
       responses:
         '201':
           description: Engagement recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [Post]
+      summary: Take back your like or dislike on a post
+      description: Views are not affected. Having no reaction to take back is not an error.
+      responses:
+        '200':
+          description: Reaction removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1057,7 +1161,10 @@ paths:
           format: uuid
     post:
       tags: [Post]
-      summary: Like/dislike/view a comment
+      summary: Like, dislike or view a comment
+      description: |
+        A user has at most one like or dislike per comment: sending the other one switches it, and
+        sending the same one again changes nothing. Views are not reactions; each one is counted.
       requestBody:
         required: true
         content:
@@ -1067,6 +1174,25 @@ paths:
       responses:
         '201':
           description: Engagement recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [Post]
+      summary: Take back your like or dislike on a comment
+      description: Views are not affected. Having no reaction to take back is not an error.
+      responses:
+        '200':
+          description: Reaction removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1150,6 +1276,67 @@ components:
         request_id:
           type: string
 
+    FarmCreated:
+      type: object
+      properties:
+        farm_id:
+          type: string
+          format: uuid
+
+    LocationCreated:
+      type: object
+      properties:
+        location_id:
+          type: string
+          format: uuid
+
+    ProductCreated:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+
+    PriceCreated:
+      type: object
+      properties:
+        price_id:
+          type: string
+          format: uuid
+
+    StockCreated:
+      type: object
+      properties:
+        stock_id:
+          type: string
+          format: uuid
+
+    TransactionsCreated:
+      type: object
+      description: The new transactions' ids, in the order they were sent
+      properties:
+        transaction_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    PostCreated:
+      type: object
+      properties:
+        post_id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+
+    CommentCreated:
+      type: object
+      properties:
+        comment_id:
+          type: string
+          format: uuid
+
     SuccessEnvelope:
       type: object
       properties:
@@ -1227,28 +1414,10 @@ components:
 
     TokenPair:
       type: object
-      description: Field names follow the Go struct's exact capitalization (no json tags defined on this type).
+      description: The access token only; the refresh token is set as the httpOnly `rid` cookie and never appears in the body. The field name keeps the Go capitalization.
       properties:
         AccessTokenStr:
           type: string
-        RefreshToken:
-          type: object
-          properties:
-            ID:
-              type: string
-              format: uuid
-            Token:
-              type: string
-            UserAgent:
-              type: string
-            IPAddress:
-              type: string
-            ExpiresAt:
-              type: integer
-              format: int64
-            UserID:
-              type: string
-              format: uuid
 
     # ---- Farm ----
     FarmRequest:
@@ -1270,8 +1439,8 @@ components:
         name:
           type: string
 
-    # ---- Weather ----
-    WeatherRequest:
+    # ---- Location ----
+    LocationRequest:
       type: object
       properties:
         longitude:
@@ -1281,10 +1450,10 @@ components:
           type: number
           format: double
 
-    WeatherResponse:
+    LocationResponse:
       type: object
       properties:
-        weather_id:
+        location_id:
           type: string
           format: uuid
         longitude:
@@ -1297,7 +1466,7 @@ components:
     # ---- Product ----
     ProductRequest:
       type: object
-      description: On create, name/description/image are all required. On update, any subset may be provided.
+      description: On create, name/description/image/unit are all required. On update, any subset may be provided.
       properties:
         name:
           type: string
@@ -1305,6 +1474,10 @@ components:
           type: string
         image:
           type: string
+        unit:
+          type: string
+          maxLength: 50
+          description: What the product is sold by, e.g. `kg` or `pcs`
 
     ProductResponse:
       type: object
@@ -1321,10 +1494,12 @@ components:
           type: string
         image:
           type: string
+        unit:
+          type: string
 
     ProductPriceRequest:
       type: object
-      required: [date_added, price]
+      required: [date_added, price, currency]
       properties:
         date_added:
           type: string
@@ -1332,6 +1507,9 @@ components:
         price:
           type: number
           format: double
+        currency:
+          type: string
+          description: ISO 4217 code, e.g. `USD`
 
     ProductPriceResponse:
       type: object
@@ -1348,6 +1526,8 @@ components:
         price:
           type: number
           format: double
+        currency:
+          type: string
 
     ProductStockRequest:
       type: object
@@ -1358,7 +1538,7 @@ components:
           format: date-time
         type:
           type: string
-          enum: [IN, OUT]
+          enum: [INCOME, EXPENSE]
         stock:
           type: number
           format: double
@@ -1377,7 +1557,7 @@ components:
           format: date-time
         type:
           type: string
-          enum: [IN, OUT]
+          enum: [INCOME, EXPENSE]
         stock:
           type: number
           format: double
@@ -1409,6 +1589,9 @@ components:
         amount:
           type: number
           format: double
+        currency:
+          type: string
+          description: ISO 4217 code, e.g. `USD`
         description:
           type: string
 
@@ -1447,6 +1630,8 @@ components:
         amount:
           type: number
           format: double
+        currency:
+          type: string
         description:
           type: string
 
@@ -1505,6 +1690,11 @@ components:
       properties:
         content:
           type: string
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The comment being answered, which must be on the same post. Omit for a top-level comment.
 
     PostEngagementRequest:
       type: object
@@ -1537,6 +1727,12 @@ components:
           type: integer
         comment_count:
           type: integer
+        author_name:
+          type: string
+        viewer_reaction:
+          type: string
+          enum: [LIKE, DISLIKE]
+          description: The requester's own reaction. Only present when they reacted, and only on `GET /post/{post_id}`.
         created_at:
           type: string
           format: date-time
@@ -1571,6 +1767,12 @@ components:
           type: integer
         view_count:
           type: integer
+        author_name:
+          type: string
+        viewer_reaction:
+          type: string
+          enum: [LIKE, DISLIKE]
+          description: The requester's own reaction. Only present when they reacted.
         created_at:
           type: string
           format: date-time
@@ -1578,6 +1780,15 @@ components:
           type: string
           format: date-time
           nullable: true
+
+    PostAuthorResponse:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
 
     PostDetailResponse:
       type: object

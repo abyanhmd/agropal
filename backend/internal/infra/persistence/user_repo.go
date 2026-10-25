@@ -8,7 +8,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -225,36 +224,4 @@ func (r *userRepo) DeleteUser(ctx context.Context, q database.Querier, userID uu
 	}
 
 	return nil
-}
-
-func (r *userRepo) ListUsersByAsset(ctx context.Context, q database.Querier, assetType shared.AssetType, assetID uuid.UUID) ([]dUser.User, error) {
-	var getQuery string
-	assetTypeStr := string(assetType)
-
-	if assetID != uuid.Nil {
-		getQuery = fmt.Sprintf(`SELECT * FROM users WHERE %s_id = $1;`, strings.ToLower(assetTypeStr))
-	} else {
-		getQuery = `SELECT * FROM users;`
-	}
-
-	var modelUsers []UserModel
-
-	if assetID != uuid.Nil {
-		if errQuery := q.SelectContext(ctx, &modelUsers, getQuery, assetID); errQuery != nil {
-			r.logger.Error(ctx, shared.AssetUser, errQuery.Error())
-			return nil, errQuery
-		}
-	} else {
-		if errQuery := q.SelectContext(ctx, &modelUsers, getQuery); errQuery != nil {
-			r.logger.Error(ctx, shared.AssetUser, errQuery.Error())
-			return nil, errQuery
-		}
-	}
-
-	domainUsers := make([]dUser.User, len(modelUsers))
-	for i, modelUser := range modelUsers {
-		domainUsers[i] = modelUser.ToDomain()
-	}
-
-	return domainUsers, nil
 }

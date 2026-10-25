@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"time"
 	dAuth "agropal/internal/domain/auth"
 	"agropal/internal/domain/shared"
 	"agropal/internal/infra/database"
@@ -66,6 +67,17 @@ func (r *authRepo) InvalidateSessions(ctx context.Context, q database.Querier, u
 	query := `DELETE FROM refresh_tokens WHERE user_id = $1;`
 
 	if _, err := q.ExecContext(ctx, query, userID); err != nil {
+		r.logger.Error(ctx, shared.AssetFarm, err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func (r *authRepo) DeleteExpiredRefreshTokens(ctx context.Context, q database.Querier, now time.Time) error {
+	query := `DELETE FROM refresh_tokens WHERE expires_at < $1;`
+
+	if _, err := q.ExecContext(ctx, query, now); err != nil {
 		r.logger.Error(ctx, shared.AssetFarm, err.Error())
 		return err
 	}

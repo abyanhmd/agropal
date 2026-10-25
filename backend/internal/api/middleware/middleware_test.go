@@ -124,7 +124,7 @@ func TestRequirePermission(t *testing.T) {
 		perms := []config.Permission{
 			config.PermDeleteAllTransactions,
 			config.PermGetManyUsers,
-			config.PermDeleteWeatherLocation,
+			config.PermDeleteLocation,
 		}
 
 		for _, perm := range perms {

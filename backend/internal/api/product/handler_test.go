@@ -85,10 +85,6 @@ func (f *fakeUserRepository) DeleteUser(context.Context, database.Querier, uuid.
 	panic("fakeUserRepository: DeleteUser not stubbed")
 }
 
-func (f *fakeUserRepository) ListUsersByAsset(context.Context, database.Querier, shared.AssetType, uuid.UUID) ([]dUser.User, error) {
-	panic("fakeUserRepository: ListUsersByAsset not stubbed")
-}
-
 // fakeFarmRepository implements dFarm.Repository.
 type fakeFarmRepository struct {
 	findFarmByIDFunc func(ctx context.Context, q database.Querier, farmID uuid.UUID) (dFarm.Farm, error)
@@ -312,7 +308,7 @@ func TestHandler_CreateProduct(t *testing.T) {
 		}
 		h := newTestHandler(t, repos)
 
-		req := authedRequest(http.MethodPost, "/farm/x/product", `{"name":"Corn","description":"Sweet corn","image":"corn.png"}`, ownerID, "user")
+		req := authedRequest(http.MethodPost, "/farm/x/product", `{"name":"Corn","description":"Sweet corn","image":"corn.png","unit":"kg"}`, ownerID, "user")
 		req.SetPathValue("farm_id", farmID.String())
 		rec := httptest.NewRecorder()
 
@@ -330,7 +326,7 @@ func TestHandler_CreateProduct(t *testing.T) {
 	t.Run("Invalid Farm ID In Path", func(t *testing.T) {
 		h := newTestHandler(t, newRepos())
 
-		req := authedRequest(http.MethodPost, "/farm/x/product", `{"name":"Corn","description":"Sweet corn","image":"corn.png"}`, ownerID, "user")
+		req := authedRequest(http.MethodPost, "/farm/x/product", `{"name":"Corn","description":"Sweet corn","image":"corn.png","unit":"kg"}`, ownerID, "user")
 		req.SetPathValue("farm_id", "not-a-uuid")
 		rec := httptest.NewRecorder()
 
@@ -407,7 +403,7 @@ func TestHandler_CreateProduct(t *testing.T) {
 		}
 		h := newTestHandler(t, repos)
 
-		req := authedRequest(http.MethodPost, "/farm/x/product", `{"name":"Corn","description":"Sweet corn","image":"corn.png"}`, otherUserID, "user")
+		req := authedRequest(http.MethodPost, "/farm/x/product", `{"name":"Corn","description":"Sweet corn","image":"corn.png","unit":"kg"}`, otherUserID, "user")
 		req.SetPathValue("farm_id", farmID.String())
 		rec := httptest.NewRecorder()
 
@@ -658,6 +654,9 @@ func TestHandler_DeleteProduct(t *testing.T) {
 				},
 			},
 			productRepo: &fakeProductRepository{
+				findProductByIDFunc: func(context.Context, database.Querier, uuid.UUID) (dProduct.Product, error) {
+					return dProduct.Product{ID: productID, FarmID: farmID}, nil
+				},
 				deleteProductFunc: func(context.Context, database.Querier, uuid.UUID) error { return nil },
 			},
 		}
@@ -728,7 +727,7 @@ func TestHandler_CreateProductPrice(t *testing.T) {
 		}
 		h := newTestHandler(t, repos)
 
-		req := httptest.NewRequest(http.MethodPost, "/farm/x/product/y/price", bytes.NewBufferString(`{"date_added":"2025-01-01T00:00:00Z","price":10.5}`))
+		req := httptest.NewRequest(http.MethodPost, "/farm/x/product/y/price", bytes.NewBufferString(`{"date_added":"2025-01-01T00:00:00Z","price":10.5,"currency":"USD"}`))
 		req.SetPathValue("farm_id", farmID.String())
 		req.SetPathValue("product_id", productID.String())
 		rec := httptest.NewRecorder()
@@ -777,7 +776,7 @@ func TestHandler_CreateProductPrice(t *testing.T) {
 		}
 		h := newTestHandler(t, repos)
 
-		req := httptest.NewRequest(http.MethodPost, "/farm/x/product/y/price", bytes.NewBufferString(`{"date_added":"2025-01-01T00:00:00Z","price":10.5}`))
+		req := httptest.NewRequest(http.MethodPost, "/farm/x/product/y/price", bytes.NewBufferString(`{"date_added":"2025-01-01T00:00:00Z","price":10.5,"currency":"USD"}`))
 		req.SetPathValue("farm_id", farmID.String())
 		req.SetPathValue("product_id", productID.String())
 		rec := httptest.NewRecorder()
@@ -851,7 +850,7 @@ func TestHandler_CreateProductStock(t *testing.T) {
 		}
 		h := newTestHandler(t, repos)
 
-		req := httptest.NewRequest(http.MethodPost, "/farm/x/product/y/stock", bytes.NewBufferString(`{"date_added":"2025-01-01T00:00:00Z","type":"IN","stock":5}`))
+		req := httptest.NewRequest(http.MethodPost, "/farm/x/product/y/stock", bytes.NewBufferString(`{"date_added":"2025-01-01T00:00:00Z","type":"INCOME","stock":5}`))
 		req.SetPathValue("farm_id", farmID.String())
 		req.SetPathValue("product_id", productID.String())
 		rec := httptest.NewRecorder()

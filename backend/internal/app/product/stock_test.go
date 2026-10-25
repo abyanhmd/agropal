@@ -35,13 +35,13 @@ func TestService_CreateProductStock(t *testing.T) {
 
 		cmd := ProductStockCommand{
 			DateAdded: shared.Ptr(time.Now().UTC().Add(-time.Hour)),
-			Type:      shared.Ptr(dProduct.MovementIn),
+			Type:      shared.Ptr(dProduct.MovementIncome),
 			Stock:     shared.Ptr(42.0),
 		}
-		if err := svc.CreateProductStock(ctxWithUser(requesterID), farmID, productID, cmd); err != nil {
+		if _, err := svc.CreateProductStock(ctxWithUser(requesterID), farmID, productID, cmd); err != nil {
 			t.Fatalf("CreateProductStock() error = %v, want nil", err)
 		}
-		if added.ProductID != productID || added.Stock != 42.0 || added.Type != dProduct.MovementIn {
+		if added.ProductID != productID || added.Stock != 42.0 || added.Type != dProduct.MovementIncome {
 			t.Errorf("added = %+v, want ProductID=%v Stock=42 Type=IN", added, productID)
 		}
 	})
@@ -62,10 +62,10 @@ func TestService_CreateProductStock(t *testing.T) {
 		strangerID := uuid.New()
 		cmd := ProductStockCommand{
 			DateAdded: shared.Ptr(time.Now().UTC()),
-			Type:      shared.Ptr(dProduct.MovementOut),
+			Type:      shared.Ptr(dProduct.MovementExpense),
 			Stock:     shared.Ptr(1.0),
 		}
-		if err := svc.CreateProductStock(ctxWithUser(strangerID), farmID, productID, cmd); err != nil {
+		if _, err := svc.CreateProductStock(ctxWithUser(strangerID), farmID, productID, cmd); err != nil {
 			t.Fatalf("CreateProductStock() error = %v, want nil (no ownership check exists)", err)
 		}
 	})
@@ -81,10 +81,10 @@ func TestService_CreateProductStock(t *testing.T) {
 
 		cmd := ProductStockCommand{
 			DateAdded: shared.Ptr(time.Now().UTC()),
-			Type:      shared.Ptr(dProduct.MovementIn),
+			Type:      shared.Ptr(dProduct.MovementIncome),
 			Stock:     shared.Ptr(1.0),
 		}
-		err := svc.CreateProductStock(ctxWithUser(requesterID), otherFarmID, productID, cmd)
+		_, err := svc.CreateProductStock(ctxWithUser(requesterID), otherFarmID, productID, cmd)
 		if err == nil {
 			t.Fatal("CreateProductStock() error = nil, want a farm/product mismatch error")
 		}
@@ -100,10 +100,10 @@ func TestService_CreateProductStock(t *testing.T) {
 
 		cmd := ProductStockCommand{
 			DateAdded: shared.Ptr(time.Now().UTC()),
-			Type:      shared.Ptr(dProduct.MovementIn),
+			Type:      shared.Ptr(dProduct.MovementIncome),
 			Stock:     shared.Ptr(0.0),
 		}
-		if err := svc.CreateProductStock(ctxWithUser(requesterID), farmID, productID, cmd); err == nil {
+		if _, err := svc.CreateProductStock(ctxWithUser(requesterID), farmID, productID, cmd); err == nil {
 			t.Fatal("CreateProductStock() error = nil, want a non-positive-stock error")
 		}
 	})
@@ -118,10 +118,10 @@ func TestService_CreateProductStock(t *testing.T) {
 
 		cmd := ProductStockCommand{
 			DateAdded: shared.Ptr(time.Now().UTC().Add(time.Hour)),
-			Type:      shared.Ptr(dProduct.MovementIn),
+			Type:      shared.Ptr(dProduct.MovementIncome),
 			Stock:     shared.Ptr(1.0),
 		}
-		if err := svc.CreateProductStock(ctxWithUser(requesterID), farmID, productID, cmd); err == nil {
+		if _, err := svc.CreateProductStock(ctxWithUser(requesterID), farmID, productID, cmd); err == nil {
 			t.Fatal("CreateProductStock() error = nil, want a future-date error")
 		}
 	})

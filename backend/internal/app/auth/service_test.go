@@ -107,19 +107,27 @@ func (f *fakeUserRepository) DeleteUser(context.Context, database.Querier, uuid.
 	panic("fakeUserRepository: DeleteUser not stubbed")
 }
 
-func (f *fakeUserRepository) ListUsersByAsset(context.Context, database.Querier, shared.AssetType, uuid.UUID) ([]dUser.User, error) {
-	panic("fakeUserRepository: ListUsersByAsset not stubbed")
-}
-
 // fakeAuthRepository implements dAuth.Repository.
 type fakeAuthRepository struct {
 	createRefreshTokenFunc func(ctx context.Context, q database.Querier, rt dAuth.RefreshToken) error
 	getRefreshTokenFunc    func(ctx context.Context, q database.Querier, refreshTokenID string) (dAuth.RefreshToken, error)
 	deleteRefreshTokenFunc func(ctx context.Context, q database.Querier, refreshTokenID string) error
+	invalidateSessionsFunc func(ctx context.Context, q database.Querier, userID uuid.UUID) error
+	deleteExpiredFunc      func(ctx context.Context, q database.Querier, now time.Time) error
 }
 
-func (f *fakeAuthRepository) InvalidateSessions(context.Context, database.Querier, uuid.UUID) error {
-	panic("fakeAuthRepository: InvalidateSessions not stubbed")
+func (f *fakeAuthRepository) DeleteExpiredRefreshTokens(ctx context.Context, q database.Querier, now time.Time) error {
+	if f.deleteExpiredFunc == nil {
+		panic("fakeAuthRepository: deleteExpiredFunc not stubbed")
+	}
+	return f.deleteExpiredFunc(ctx, q, now)
+}
+
+func (f *fakeAuthRepository) InvalidateSessions(ctx context.Context, q database.Querier, userID uuid.UUID) error {
+	if f.invalidateSessionsFunc == nil {
+		panic("fakeAuthRepository: invalidateSessionsFunc not stubbed")
+	}
+	return f.invalidateSessionsFunc(ctx, q, userID)
 }
 
 func (f *fakeAuthRepository) CreateRefreshToken(ctx context.Context, q database.Querier, rt dAuth.RefreshToken) error {
@@ -210,7 +218,7 @@ func TestService_SendVerificationCode(t *testing.T) {
 		}
 		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, redisClient)
 
-		if err := svc.SendVerificationCode(context.Background(), VerificationPurposeRegister, email); err != nil {
+		if _, err := svc.SendVerificationCode(context.Background(), VerificationPurposeRegister, email); err != nil {
 			t.Fatalf("SendVerificationCode() error = %v, want nil", err)
 		}
 
@@ -251,7 +259,7 @@ func TestService_SendVerificationCode(t *testing.T) {
 		}
 		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, redisClient)
 
-		err := svc.SendVerificationCode(context.Background(), VerificationPurposeRegister, email)
+		_, err := svc.SendVerificationCode(context.Background(), VerificationPurposeRegister, email)
 		if !errors.Is(err, dAuth.ErrRateLimited) {
 			t.Errorf("SendVerificationCode() error = %v, want %v", err, dAuth.ErrRateLimited)
 		}
@@ -267,7 +275,7 @@ func TestService_SendVerificationCode(t *testing.T) {
 		}
 		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, redisClient)
 
-		err := svc.SendVerificationCode(context.Background(), VerificationPurposeRegister, email)
+		_, err := svc.SendVerificationCode(context.Background(), VerificationPurposeRegister, email)
 		if !errors.Is(err, wantErr) {
 			t.Errorf("SendVerificationCode() error = %v, want %v", err, wantErr)
 		}
@@ -396,6 +404,23 @@ func TestService_VerifyCode(t *testing.T) {
 
 /* ==================== Tests: Register / VerifyRegistration ==================== */
 
+func TestService_Register_NewEmailIsNotFound(t *testing.T) {
+	redisClient := newTestRedis(t)
+	// The Postgres repository reports "nobody has this email" as ErrNotFound, not as an empty user
+	userRepo := &fakeUserRepository{
+		findUserByEmailFunc: func(context.Context, database.Querier, string) (dUser.User, error) {
+			return dUser.User{}, dUser.ErrNotFound
+		},
+	}
+	pub := &fakePublisher{publishMessageFunc: func(context.Context, []byte) error { return nil }}
+	svc := newService(userRepo, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, redisClient)
+
+	cmd := CreateUserCommand{Name: "Jane", Email: "jane@example.com", Username: "jane", Password: "Str0ng!Pass"}
+	if _, err := svc.Register(context.Background(), cmd); err != nil {
+		t.Fatalf("Register() error = %v, want nil", err)
+	}
+}
+
 func TestService_Register(t *testing.T) {
 	t.Run("stages the hashed user in redis and sends a verification code", func(t *testing.T) {
 		redisClient := newTestRedis(t)
@@ -411,7 +436,7 @@ func TestService_Register(t *testing.T) {
 		svc := newService(userRepo, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, redisClient)
 
 		cmd := CreateUserCommand{Name: "Jane", Email: "jane@example.com", Username: "jane", Password: "Str0ng!Pass"}
-		if err := svc.Register(context.Background(), cmd); err != nil {
+		if _, err := svc.Register(context.Background(), cmd); err != nil {
 			t.Fatalf("Register() error = %v, want nil", err)
 		}
 
@@ -446,7 +471,7 @@ func TestService_Register(t *testing.T) {
 		svc := newService(userRepo, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, redisClient)
 
 		cmd := CreateUserCommand{Name: "Jane", Email: "jane@example.com", Username: "jane", Password: "Str0ng!Pass"}
-		err := svc.Register(context.Background(), cmd)
+		_, err := svc.Register(context.Background(), cmd)
 		if err == nil {
 			t.Fatal("Register() error = nil, want error when SendVerificationCode fails")
 		}
@@ -469,7 +494,7 @@ func TestService_Register(t *testing.T) {
 		svc := newService(userRepo, &fakeAuthRepository{}, &fakePublisher{}, &fakeTokenProvider{}, redisClient)
 
 		cmd := CreateUserCommand{Name: "Jane", Email: "jane@example.com", Username: "jane", Password: "Str0ng!Pass"}
-		err := svc.Register(context.Background(), cmd)
+		_, err := svc.Register(context.Background(), cmd)
 		if !errors.Is(err, dAuth.ErrAlreadyRegistered) {
 			t.Errorf("Register() error = %v, want %v", err, dAuth.ErrAlreadyRegistered)
 		}
@@ -570,7 +595,7 @@ func TestService_Login(t *testing.T) {
 		svc := newService(userRepo, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, redisClient)
 
 		cmd := LoginUserCommand{Email: shared.Ptr(email), Password: "Str0ng!Pass"}
-		if err := svc.Login(context.Background(), cmd); err != nil {
+		if _, err := svc.Login(context.Background(), cmd); err != nil {
 			t.Fatalf("Login() error = %v, want nil", err)
 		}
 		if !published {
@@ -588,9 +613,50 @@ func TestService_Login(t *testing.T) {
 		svc := newService(userRepo, &fakeAuthRepository{}, &fakePublisher{}, &fakeTokenProvider{}, redisClient)
 
 		cmd := LoginUserCommand{Email: shared.Ptr(email), Password: "wrong-password"}
-		err := svc.Login(context.Background(), cmd)
-		if !errors.Is(err, dAuth.ErrInvalidPassword) {
-			t.Errorf("Login() error = %v, want %v", err, dAuth.ErrInvalidPassword)
+		_, err := svc.Login(context.Background(), cmd)
+		if !errors.Is(err, dAuth.ErrInvalidCredentials) {
+			t.Errorf("Login() error = %v, want %v", err, dAuth.ErrInvalidCredentials)
+		}
+	})
+
+	t.Run("answers an unknown account exactly like a wrong password", func(t *testing.T) {
+		redisClient := newTestRedis(t)
+		pub := &fakePublisher{publishMessageFunc: func(context.Context, []byte) error {
+			t.Fatal("no code should be sent for an unknown account")
+			return nil
+		}}
+		unknownEmail := &fakeUserRepository{
+			findUserByEmailFunc: func(context.Context, database.Querier, string) (dUser.User, error) {
+				return dUser.User{}, dUser.ErrNotFound
+			},
+			findUserByUsernameFunc: func(context.Context, database.Querier, string) (dUser.User, error) {
+				return dUser.User{}, dUser.ErrNotFound
+			},
+		}
+		svc := newService(unknownEmail, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, redisClient)
+
+		for name, cmd := range map[string]LoginUserCommand{
+			"by email":    {Email: shared.Ptr("nobody@example.com"), Password: "Str0ng!Pass"},
+			"by username": {Username: shared.Ptr("nobody"), Password: "Str0ng!Pass"},
+		} {
+			if _, err := svc.Login(context.Background(), cmd); !errors.Is(err, dAuth.ErrInvalidCredentials) {
+				t.Errorf("Login() %s error = %v, want %v", name, err, dAuth.ErrInvalidCredentials)
+			}
+		}
+	})
+
+	t.Run("still reports a lookup failure that is not a missing account", func(t *testing.T) {
+		boom := errors.New("database down")
+		userRepo := &fakeUserRepository{
+			findUserByEmailFunc: func(context.Context, database.Querier, string) (dUser.User, error) {
+				return dUser.User{}, boom
+			},
+		}
+		svc := newService(userRepo, &fakeAuthRepository{}, &fakePublisher{}, &fakeTokenProvider{}, newTestRedis(t))
+
+		_, err := svc.Login(context.Background(), LoginUserCommand{Email: shared.Ptr(email), Password: "Str0ng!Pass"})
+		if !errors.Is(err, boom) {
+			t.Errorf("Login() error = %v, want %v", err, boom)
 		}
 	})
 
@@ -606,7 +672,7 @@ func TestService_Login(t *testing.T) {
 		svc := newService(userRepo, &fakeAuthRepository{}, &fakePublisher{}, &fakeTokenProvider{}, redisClient)
 
 		cmd := LoginUserCommand{Email: shared.Ptr(email), Password: "Str0ng!Pass"}
-		err := svc.Login(context.Background(), cmd)
+		_, err := svc.Login(context.Background(), cmd)
 		if !errors.Is(err, dAuth.ErrEmailNotVerified) {
 			t.Errorf("Login() error = %v, want %v", err, dAuth.ErrEmailNotVerified)
 		}
@@ -673,8 +739,8 @@ func TestService_Refresh(t *testing.T) {
 		redisClient := newTestRedis(t)
 		jwt := &fakeTokenProvider{
 			validateTokenFunc: func(_ context.Context, tokenType shared.TokenType, token string) (shared.ClaimInfo, error) {
-				if tokenType != shared.TypeRefresh || token != refreshID {
-					t.Fatalf("ValidateToken called with (%v, %q), want (%v, %q)", tokenType, token, shared.TypeRefresh, refreshID)
+				if tokenType != shared.TypeRefresh || token != "stored-token" {
+					t.Fatalf("ValidateToken called with (%v, %q), want (%v, %q)", tokenType, token, shared.TypeRefresh, "stored-token")
 				}
 				return shared.ClaimInfo{UserID: userID}, nil
 			},
@@ -691,7 +757,7 @@ func TestService_Refresh(t *testing.T) {
 		var created dAuth.RefreshToken
 		authRepo := &fakeAuthRepository{
 			getRefreshTokenFunc: func(context.Context, database.Querier, string) (dAuth.RefreshToken, error) {
-				return dAuth.RefreshToken{ID: refreshID, UserID: userID}, nil
+				return dAuth.RefreshToken{ID: refreshID, Token: "stored-token", UserID: userID}, nil
 			},
 			deleteRefreshTokenFunc: func(_ context.Context, _ database.Querier, id string) error {
 				deletedID = id
@@ -797,6 +863,43 @@ func TestService_Invalidate(t *testing.T) {
 
 /* ==================== Tests: RequestPasswordReset / ConfirmPasswordReset ==================== */
 
+func TestService_RequestPasswordReset_SameAnswerEitherWay(t *testing.T) {
+	t.Run("asking again inside the cooldown still looks like success", func(t *testing.T) {
+		redisClient := newTestRedis(t)
+		userRepo := &fakeUserRepository{
+			findUserByEmailFunc: func(context.Context, database.Querier, string) (dUser.User, error) {
+				return dUser.User{ID: uuid.New()}, nil
+			},
+		}
+		var sent int
+		pub := &fakePublisher{publishMessageFunc: func(context.Context, []byte) error { sent++; return nil }}
+		svc := newService(userRepo, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, redisClient)
+
+		for i := 0; i < 2; i++ {
+			if err := svc.RequestPasswordReset(context.Background(), "jane@example.com"); err != nil {
+				t.Fatalf("request %d: RequestPasswordReset() error = %v, want nil", i+1, err)
+			}
+		}
+		if sent != 1 {
+			t.Errorf("%d codes sent, want 1 (the second request is inside the cooldown)", sent)
+		}
+	})
+
+	t.Run("a failed send looks like success too", func(t *testing.T) {
+		userRepo := &fakeUserRepository{
+			findUserByEmailFunc: func(context.Context, database.Querier, string) (dUser.User, error) {
+				return dUser.User{ID: uuid.New()}, nil
+			},
+		}
+		pub := &fakePublisher{publishMessageFunc: func(context.Context, []byte) error { return errors.New("broker unavailable") }}
+		svc := newService(userRepo, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, newTestRedis(t))
+
+		if err := svc.RequestPasswordReset(context.Background(), "jane@example.com"); err != nil {
+			t.Errorf("RequestPasswordReset() error = %v, want nil", err)
+		}
+	})
+}
+
 func TestService_RequestPasswordReset(t *testing.T) {
 	t.Run("silently succeeds for an unknown email", func(t *testing.T) {
 		redisClient := newTestRedis(t)
@@ -856,6 +959,11 @@ func TestService_ConfirmPasswordReset(t *testing.T) {
 			return dUser.User{ID: userID}, nil
 		},
 	}
+	var verifiedUserID uuid.UUID
+	userRepo.verifyUserEmailFunc = func(_ context.Context, _ database.Querier, id uuid.UUID, _ time.Time) error {
+		verifiedUserID = id
+		return nil
+	}
 	var savedUserID uuid.UUID
 	var savedPassword string
 	userRepo.updateUserPasswordFunc = func(_ context.Context, _ database.Querier, id uuid.UUID, password string) error {
@@ -863,7 +971,14 @@ func TestService_ConfirmPasswordReset(t *testing.T) {
 		savedPassword = password
 		return nil
 	}
-	svc := newService(userRepo, &fakeAuthRepository{}, &fakePublisher{}, &fakeTokenProvider{}, redisClient)
+	var invalidated uuid.UUID
+	authRepo := &fakeAuthRepository{
+		invalidateSessionsFunc: func(_ context.Context, _ database.Querier, id uuid.UUID) error {
+			invalidated = id
+			return nil
+		},
+	}
+	svc := newService(userRepo, authRepo, &fakePublisher{}, &fakeTokenProvider{}, redisClient)
 
 	if err := svc.ConfirmPasswordReset(context.Background(), email, code, "NewStr0ng!Pass"); err != nil {
 		t.Fatalf("ConfirmPasswordReset() error = %v, want nil", err)
@@ -873,6 +988,59 @@ func TestService_ConfirmPasswordReset(t *testing.T) {
 	}
 	if savedPassword == "NewStr0ng!Pass" || savedPassword == "" {
 		t.Errorf("savedPassword = %q, want a bcrypt hash", savedPassword)
+	}
+	if invalidated != userID {
+		t.Errorf("sessions invalidated for %v, want %v (a reset must end every existing session)", invalidated, userID)
+	}
+	if verifiedUserID != userID {
+		t.Errorf("email verified for %v, want %v (the account had never verified, and the code proves the address)", verifiedUserID, userID)
+	}
+}
+
+func TestService_ConfirmPasswordReset_AlreadyVerified(t *testing.T) {
+	email := "jane@example.com"
+	code := "abc123"
+	userID := uuid.New()
+
+	redisClient := newTestRedis(t)
+	payload, _ := json.Marshal(verificationRecord{
+		CodeHash:  hashVerificationCode(code),
+		Status:    verificationStatusPending,
+		ExpiresAt: time.Now().UTC().Add(verificationCodeTTL),
+	})
+	if err := redisClient.Set(context.Background(), "reset_password:"+email, payload, verificationCodeTTL).Err(); err != nil {
+		t.Fatalf("seed redis: %v", err)
+	}
+
+	// verifyUserEmailFunc is left unstubbed: an already verified account must not be verified again
+	userRepo := &fakeUserRepository{
+		findUserByEmailFunc: func(context.Context, database.Querier, string) (dUser.User, error) {
+			return dUser.User{ID: userID, Metadata: dUser.UserMetadata{EmailVerifiedAt: shared.Ptr(time.Now().UTC())}}, nil
+		},
+		updateUserPasswordFunc: func(context.Context, database.Querier, uuid.UUID, string) error { return nil },
+	}
+	authRepo := &fakeAuthRepository{invalidateSessionsFunc: func(context.Context, database.Querier, uuid.UUID) error { return nil }}
+	svc := newService(userRepo, authRepo, &fakePublisher{}, &fakeTokenProvider{}, redisClient)
+
+	if err := svc.ConfirmPasswordReset(context.Background(), email, code, "NewStr0ng!Pass"); err != nil {
+		t.Fatalf("ConfirmPasswordReset() error = %v, want nil", err)
+	}
+}
+
+func TestService_PruneExpiredSessions(t *testing.T) {
+	var cutoff time.Time
+	authRepo := &fakeAuthRepository{}
+	authRepo.deleteExpiredFunc = func(_ context.Context, _ database.Querier, now time.Time) error {
+		cutoff = now
+		return nil
+	}
+	svc := newService(&fakeUserRepository{}, authRepo, &fakePublisher{}, &fakeTokenProvider{}, newTestRedis(t))
+
+	if err := svc.PruneExpiredSessions(context.Background()); err != nil {
+		t.Fatalf("PruneExpiredSessions() error = %v, want nil", err)
+	}
+	if time.Since(cutoff) > time.Minute || cutoff.IsZero() {
+		t.Errorf("tokens were pruned as of %v, want about now", cutoff)
 	}
 }
 
@@ -918,6 +1086,29 @@ func TestService_Authorize(t *testing.T) {
 		err := svc.Authorize(context.Background(), uuid.New(), "ADMIN")
 		if !errors.Is(err, shared.ErrForbidden) {
 			t.Errorf("Authorize() error = %v, want %v", err, shared.ErrForbidden)
+		}
+	})
+}
+
+func TestService_ExposeCodes(t *testing.T) {
+	email := "user@example.com"
+	pub := &fakePublisher{publishMessageFunc: func(context.Context, []byte) error { return nil }}
+
+	t.Run("returns nothing by default", func(t *testing.T) {
+		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, newTestRedis(t))
+		data, err := svc.SendVerificationCode(context.Background(), VerificationPurposeRegister, email)
+		if err != nil || data != nil {
+			t.Errorf("SendVerificationCode() = (%v, %v), want (nil, nil)", data, err)
+		}
+	})
+
+	t.Run("returns the code when switched on", func(t *testing.T) {
+		svc := newService(&fakeUserRepository{}, &fakeAuthRepository{}, pub, &fakeTokenProvider{}, newTestRedis(t))
+		svc.ExposeCodes(true)
+		data, err := svc.SendVerificationCode(context.Background(), VerificationPurposeRegister, email)
+		got, ok := data.(map[string]string)
+		if err != nil || !ok || got["code"] == "" {
+			t.Errorf("SendVerificationCode() = (%v, %v), want a code", data, err)
 		}
 	})
 }

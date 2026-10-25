@@ -47,8 +47,8 @@ func TestCORS(t *testing.T) {
 		if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
 			t.Errorf("Access-Control-Allow-Credentials = %q, want %q", got, "true")
 		}
-		if got := rec.Header().Get("Access-Control-Expose-Headers"); got != RequestIDHeader {
-			t.Errorf("Access-Control-Expose-Headers = %q, want %q", got, RequestIDHeader)
+		if got := rec.Header().Get("Access-Control-Expose-Headers"); got != RequestIDHeader+", "+TotalCountHeader {
+			t.Errorf("Access-Control-Expose-Headers = %q, want %q", got, RequestIDHeader+", "+TotalCountHeader)
 		}
 		if got := rec.Header().Get("Vary"); got != "Origin" {
 			t.Errorf("Vary = %q, want %q", got, "Origin")

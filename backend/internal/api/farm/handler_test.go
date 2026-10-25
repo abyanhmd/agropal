@@ -83,10 +83,6 @@ func (f *fakeUserRepository) DeleteUser(context.Context, database.Querier, uuid.
 	panic("fakeUserRepository: DeleteUser not stubbed")
 }
 
-func (f *fakeUserRepository) ListUsersByAsset(context.Context, database.Querier, shared.AssetType, uuid.UUID) ([]dUser.User, error) {
-	panic("fakeUserRepository: ListUsersByAsset not stubbed")
-}
-
 // fakeFarmRepository implements dFarm.Repository. Only stubbed methods are
 // callable; everything else panics.
 type fakeFarmRepository struct {

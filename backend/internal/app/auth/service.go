@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -53,6 +54,9 @@ type Service struct {
 	queue      queue.Publisher
 	authRepo   dAuth.Repository
 	userRepo   dUser.Repository
+
+	// exposeCodes puts each issued code in the API response; development only, see exposed
+	exposeCodes bool
 }
 
 func NewService(
@@ -94,18 +98,35 @@ func hashVerificationCode(code string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (s *Service) SendVerificationCode(ctx context.Context, purpose VerificationPurpose, email string) error {
+func (s *Service) SendVerificationCode(ctx context.Context, purpose VerificationPurpose, email string) (any, error) {
+	code, err := s.issueVerificationCode(ctx, purpose, email)
+	if err != nil {
+		return nil, err
+	}
+	return s.exposed(code), nil
+}
+
+// exposed is what a response may carry about a code: nothing, unless the deployment opted in for
+// development. A code in the response would let anyone verify an email address they do not own.
+func (s *Service) exposed(code string) any {
+	if !s.exposeCodes {
+		return nil
+	}
+	return map[string]string{"code": code}
+}
+
+func (s *Service) issueVerificationCode(ctx context.Context, purpose VerificationPurpose, email string) (string, error) {
 	redisKey := fmt.Sprintf("%s:%s", string(purpose), email)
 
 	// Refuse to reissue a code while a recent one is still fresh, so a caller
 	// can't be used to spam a victim's inbox or hammer the cache.
 	if ttl, err := s.redis.TTL(ctx, redisKey).Result(); err == nil && ttl > verificationCodeTTL-verificationResendCooldown {
-		return dAuth.ErrRateLimited
+		return "", dAuth.ErrRateLimited
 	}
 
 	verificationCode, err := s.generator.GenerateHexID()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	record := verificationRecord{
@@ -116,11 +137,11 @@ func (s *Service) SendVerificationCode(ctx context.Context, purpose Verification
 
 	payload, err := json.Marshal(record)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if err = s.redis.Set(ctx, redisKey, payload, verificationCodeTTL).Err(); err != nil {
-		return err
+		return "", err
 	}
 
 	// The plaintext code only ever leaves this function on the queue message
@@ -133,17 +154,17 @@ func (s *Service) SendVerificationCode(ctx context.Context, purpose Verification
 	}
 	taskPayload, err := json.Marshal(task)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if err = s.queue.PublishMessage(ctx, taskPayload); err != nil {
 		s.logger.Error(ctx, shared.System, fmt.Sprintf("Failed to enqueue verification email for %s: %s", email, err.Error()))
 		// Don't leave a code the user can never receive sitting in the cache.
 		_ = s.redis.Del(ctx, redisKey).Err()
-		return err
+		return "", err
 	}
 
-	return nil
+	return verificationCode, nil
 }
 
 // checkCode validates purpose/email/token against Redis without marking the
@@ -222,6 +243,20 @@ func (s *Service) VerifyCode(ctx context.Context, purpose VerificationPurpose, e
 
 /* ==================== Identity ====================== */
 
+var (
+	unknownHash     []byte
+	unknownHashOnce sync.Once
+)
+
+// unknownAccountHash is a bcrypt hash nobody has the password for, compared against when a login
+// names no account so that the attempt takes as long as one for a real account.
+func unknownAccountHash() []byte {
+	unknownHashOnce.Do(func() {
+		unknownHash, _ = bcrypt.GenerateFromPassword([]byte(uuid.NewString()), bcrypt.DefaultCost)
+	})
+	return unknownHash
+}
+
 // registerPendingKey namespaces the Redis key holding a not-yet-created
 // account's data while it waits on VerifyRegistration, so it can't collide
 // with any other feature that happens to key Redis by a bare email address.
@@ -234,40 +269,42 @@ func registerPendingKey(email string) string {
 // row in Postgres once that code is confirmed, so no unverified account
 // ever sits in the database. If SendVerificationCode fails, nothing beyond
 // the staged Redis entry exists yet and the caller can just retry.
-func (s *Service) Register(ctx context.Context, cmd CreateUserCommand) error {
+func (s *Service) Register(ctx context.Context, cmd CreateUserCommand) (any, error) {
+	// Finding no one is the normal case here: the repository reports it as ErrNotFound
 	exists, err := s.userRepo.FindUserByEmail(ctx, s.transactor.DB(), cmd.Email)
-	if err != nil {
-		return err
+	if err != nil && !errors.Is(err, dUser.ErrNotFound) {
+		return nil, err
 	}
 	if exists.ID != uuid.Nil {
-		return dAuth.ErrAlreadyRegistered
+		return nil, dAuth.ErrAlreadyRegistered
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(cmd.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	cmd.Password = string(hashedPassword)
 
 	userID, err := uuid.NewV7()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	user := cmd.ToDomain(userID)
 
 	payloadJSON, err := json.Marshal(user)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err = s.redis.Set(ctx, registerPendingKey(cmd.Email), payloadJSON, verificationCodeTTL).Err(); err != nil {
-		return err
+		return nil, err
 	}
 
-	if err = s.SendVerificationCode(ctx, VerificationPurposeRegister, cmd.Email); err != nil {
-		return err
+	data, err := s.SendVerificationCode(ctx, VerificationPurposeRegister, cmd.Email)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	return data, nil
 }
 
 // VerifyRegistration confirms a pending registration's code and creates the
@@ -332,33 +369,37 @@ func (s *Service) VerifyRegistration(ctx context.Context, email, code string) (d
 // Login validates the account's credentials and, on success, emails a
 // one-time code rather than issuing tokens directly; VerifyLogin completes
 // the sign-in once that code is confirmed.
-func (s *Service) Login(ctx context.Context, cmd LoginUserCommand) error {
+//
+// An unknown account and a wrong password give the same answer, and take about as long, so the
+// response can't be used to find out who has an account. The unverified-email answer only follows
+// a correct password, so it tells nothing to someone who doesn't already hold the credentials.
+func (s *Service) Login(ctx context.Context, cmd LoginUserCommand) (any, error) {
 	var user dUser.User
 	var err error
 
 	if cmd.Email != nil {
 		user, err = s.userRepo.FindUserByEmail(ctx, s.transactor.DB(), *cmd.Email)
-		if err != nil {
-			return err
-		}
 	}
 	if cmd.Username != nil {
 		user, err = s.userRepo.FindUserByUsername(ctx, s.transactor.DB(), *cmd.Username)
-		if err != nil {
-			return err
-		}
 	}
-
-	if user == (dUser.User{}) {
-		return dAuth.ErrInvalidCredentials
+	if err != nil && !errors.Is(err, dUser.ErrNotFound) {
+		return nil, err
 	}
+	known := err == nil && user.ID != uuid.Nil
 
-	if err = bcrypt.CompareHashAndPassword([]byte(user.Security.Password), []byte(cmd.Password)); err != nil {
-		return dAuth.ErrInvalidPassword
+	// Compare against a throwaway hash when there is no account, so both paths cost one bcrypt
+	hash := []byte(user.Security.Password)
+	if !known {
+		hash = unknownAccountHash()
+	}
+	passwordOK := bcrypt.CompareHashAndPassword(hash, []byte(cmd.Password)) == nil
+	if !known || !passwordOK {
+		return nil, dAuth.ErrInvalidCredentials
 	}
 
 	if user.Metadata.EmailVerifiedAt == nil {
-		return dAuth.ErrEmailNotVerified
+		return nil, dAuth.ErrEmailNotVerified
 	}
 
 	return s.SendVerificationCode(ctx, VerificationPurposeLogin, user.Account.Email)
@@ -396,15 +437,17 @@ func (s *Service) VerifyLogin(ctx context.Context, email, code string) (dAuth.To
 
 /* ==================== Tokens ====================== */
 
+// The rid cookie carries the refresh token's id, not the token: the id finds the stored (encrypted)
+// token, and that is what gets validated.
 func (s *Service) Refresh(ctx context.Context, refreshID string) (dAuth.TokenPair, error) {
-	claims, err := s.jwt.ValidateToken(ctx, shared.TypeRefresh, refreshID)
-	if err != nil {
-		return dAuth.TokenPair{}, err
-	}
-
 	storedToken, err := s.authRepo.GetRefreshToken(ctx, s.transactor.DB(), refreshID)
 	if err != nil {
 		return dAuth.TokenPair{}, dAuth.ErrTokenRevoked
+	}
+
+	claims, err := s.jwt.ValidateToken(ctx, shared.TypeRefresh, storedToken.Token)
+	if err != nil {
+		return dAuth.TokenPair{}, err
 	}
 
 	if claims.UserID != storedToken.UserID {
@@ -444,14 +487,14 @@ func (s *Service) Refresh(ctx context.Context, refreshID string) (dAuth.TokenPai
 }
 
 func (s *Service) Invalidate(ctx context.Context, refreshID string) error {
-	claims, err := s.jwt.ValidateToken(ctx, shared.TypeRefresh, refreshID)
-	if err != nil {
-		return err
-	}
-
 	storedToken, err := s.authRepo.GetRefreshToken(ctx, s.transactor.DB(), refreshID)
 	if err != nil {
 		return dAuth.ErrTokenRevoked
+	}
+
+	claims, err := s.jwt.ValidateToken(ctx, shared.TypeRefresh, storedToken.Token)
+	if err != nil {
+		return err
 	}
 
 	if claims.UserID != storedToken.UserID {
@@ -473,6 +516,12 @@ func (s *Service) Invalidate(ctx context.Context, refreshID string) error {
 	return nil
 }
 
+// PruneExpiredSessions deletes refresh tokens that have expired. Rotation and logout remove their own,
+// so what is left is tokens that were simply never used again.
+func (s *Service) PruneExpiredSessions(ctx context.Context) error {
+	return s.authRepo.DeleteExpiredRefreshTokens(ctx, s.transactor.DB(), time.Now().UTC())
+}
+
 /* ==================== Recovery ====================== */
 
 // RequestPasswordReset emails a one-time code for the given email. It
@@ -487,7 +536,15 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email string) error 
 		return err
 	}
 
-	return s.SendVerificationCode(ctx, VerificationPurposeResetPassword, email)
+	// Whether a code goes out must not show in the response, or asking twice inside the cooldown
+	// would tell a stranger that the account exists. A failure is logged instead.
+	if _, err = s.SendVerificationCode(ctx, VerificationPurposeResetPassword, email); err != nil {
+		if !errors.Is(err, dAuth.ErrRateLimited) {
+			s.logger.Error(ctx, shared.System, fmt.Sprintf("password reset code for %s was not sent: %s", email, err.Error()))
+		}
+	}
+
+	return nil
 }
 
 // ConfirmPasswordReset verifies the one-time code from RequestPasswordReset
@@ -507,7 +564,20 @@ func (s *Service) ConfirmPasswordReset(ctx context.Context, email, code, newPass
 		return err
 	}
 
-	return s.userRepo.UpdateUserPassword(ctx, s.transactor.DB(), user.ID, string(hashedPassword))
+	// Whoever held the old password (or a stolen session) must not stay signed in after a reset
+	return s.transactor.WithTx(ctx, func(q database.Querier) error {
+		if err = s.userRepo.UpdateUserPassword(ctx, q, user.ID, string(hashedPassword)); err != nil {
+			return err
+		}
+		// The code went to this email address, so using it also proves the address is theirs. Without
+		// this an account that never verified would get a new password and still be unable to sign in.
+		if user.Metadata.EmailVerifiedAt == nil {
+			if err = s.userRepo.VerifyUserEmail(ctx, q, user.ID, time.Now().UTC()); err != nil {
+				return err
+			}
+		}
+		return s.authRepo.InvalidateSessions(ctx, q, user.ID)
+	})
 }
 
 /* ==================== Authorization ====================== */
@@ -527,4 +597,10 @@ func (s *Service) Authorize(ctx context.Context, userID uuid.UUID, requiredRole 
 	}
 
 	return nil
+}
+
+// ExposeCodes makes register, login and resend-code return the code they emailed, so a developer
+// without a mail server can still sign in. Never enable it where real users register.
+func (s *Service) ExposeCodes(on bool) {
+	s.exposeCodes = on
 }

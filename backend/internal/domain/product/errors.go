@@ -11,6 +11,7 @@ var (
 	ErrInvalidName        shared.ErrorKey = "PRODUCT.INVALID_NAME"
 	ErrInvalidDescription shared.ErrorKey = "PRODUCT.INVALID_DESCRIPTION"
 	ErrInvalidImage       shared.ErrorKey = "PRODUCT.INVALID_IMAGE"
+	ErrInvalidUnit        shared.ErrorKey = "PRODUCT.INVALID_UNIT"
 	ErrInvalidFarmID      shared.ErrorKey = "PRODUCT.INVALID_FARM_ID"
 
 	ErrCreateFailed shared.ErrorKey = "PRODUCT.CREATE_FAILED"
@@ -25,6 +26,7 @@ var (
 	ErrPriceNotFound       shared.ErrorKey = "PRODUCT.PRICE_NOT_FOUND"
 	ErrInvalidPriceID      shared.ErrorKey = "PRODUCT.INVALID_PRICE_ID"
 	ErrInvalidPriceAmount  shared.ErrorKey = "PRODUCT.INVALID_PRICE_AMOUNT"
+	ErrInvalidCurrency     shared.ErrorKey = "PRODUCT.INVALID_CURRENCY"
 	ErrInsufficientStock   shared.ErrorKey = "PRODUCT.INSUFFICIENT_STOCK"
 	ErrInvalidMovementType shared.ErrorKey = "PRODUCT.INVALID_MOVEMENT_TYPE"
 

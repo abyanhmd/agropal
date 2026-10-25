@@ -29,7 +29,7 @@ func TestHasPermission(t *testing.T) {
 			PermGetManyPosts,
 			PermGetOneProduct,
 			PermGetManyProducts,
-			PermGetWeatherLocationByFarmID,
+			PermGetLocationByFarmID,
 		}
 		for _, perm := range readPerms {
 			if !HasPermission(RoleGuest, perm) {

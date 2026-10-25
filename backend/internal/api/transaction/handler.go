@@ -51,12 +51,13 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = h.transactionService.Create(ctx, farmID, productID, req.ToCommands()); err != nil {
+	ids, err := h.transactionService.Create(ctx, farmID, productID, req.ToCommands())
+	if err != nil {
 		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.ioHandler.WriteSuccess(ctx, w, dTransaction.SuccessCreated, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dTransaction.SuccessCreated, response.TransactionsCreatedResponse{TransactionIDs: ids})
 }
 
 func (h *Handler) GetOne(w http.ResponseWriter, r *http.Request) {

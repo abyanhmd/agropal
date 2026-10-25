@@ -12,6 +12,7 @@ func DomainToProductResponse(p dProduct.Product) response.ProductResponse {
 		Name:        p.Name,
 		Description: p.Description,
 		Image:       p.Image,
+		Unit:        p.Unit,
 	}
 }
 
@@ -31,6 +32,7 @@ func DomainToProductPriceResponse(p dProduct.ProductPrice) response.ProductPrice
 		ProductID: p.ProductID,
 		DateAdded: p.DateAdded,
 		Price:     p.Price,
+		Currency:  p.Currency,
 	}
 }
 

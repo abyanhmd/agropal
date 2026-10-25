@@ -12,6 +12,7 @@ type ProductResponse struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Image       string    `json:"image"`
+	Unit        string    `json:"unit"`
 }
 
 type ProductStockResponse struct {
@@ -27,6 +28,7 @@ type ProductPriceResponse struct {
 	ProductID uuid.UUID `json:"product_id"`
 	DateAdded time.Time `json:"date_added"`
 	Price     float64   `json:"price"`
+	Currency  string    `json:"currency"`
 }
 
 type ProductDetailResponse struct {

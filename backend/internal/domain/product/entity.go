@@ -18,6 +18,7 @@ type Product struct {
 	Name        string
 	Description string
 	Image       string
+	Unit        string
 	FarmID      uuid.UUID
 }
 
@@ -34,13 +35,14 @@ type ProductPrice struct {
 	ProductID uuid.UUID
 	DateAdded time.Time
 	Price     float64
+	Currency  string
 }
 
 type StockMovementType string
 
 const (
-	MovementIn  StockMovementType = "IN"
-	MovementOut StockMovementType = "OUT"
+	MovementIncome  StockMovementType = "INCOME"
+	MovementExpense StockMovementType = "EXPENSE"
 )
 
 var (

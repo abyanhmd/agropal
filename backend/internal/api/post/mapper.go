@@ -7,33 +7,37 @@ import (
 
 func DomainToPostResponse(p dPost.Post) response.PostResponse {
 	return response.PostResponse{
-		PostID:       p.ID,
-		UserID:       p.UserID,
-		Title:        p.Title,
-		Content:      p.Content,
-		Slug:         p.Slug,
-		LikeCount:    p.LikeCount,
-		DislikeCount: p.DislikeCount,
-		ViewCount:    p.ViewCount,
-		CommentCount: p.CommentCount,
-		CreatedAt:    p.CreatedAt,
-		UpdatedAt:    p.UpdatedAt,
+		PostID:         p.ID,
+		UserID:         p.UserID,
+		Title:          p.Title,
+		Content:        p.Content,
+		Slug:           p.Slug,
+		LikeCount:      p.LikeCount,
+		DislikeCount:   p.DislikeCount,
+		ViewCount:      p.ViewCount,
+		CommentCount:   p.CommentCount,
+		AuthorName:     p.AuthorName,
+		ViewerReaction: string(p.ViewerReaction),
+		CreatedAt:      p.CreatedAt,
+		UpdatedAt:      p.UpdatedAt,
 	}
 }
 
 func DomainToPostCommentResponse(c dPost.PostComment) response.PostCommentResponse {
 	return response.PostCommentResponse{
-		CommentID:    c.ID,
-		PostID:       c.PostID,
-		UserID:       c.UserID,
-		ParentID:     c.ParentID,
-		Content:      c.Content,
-		ReplyCount:   c.ReplyCount,
-		LikeCount:    c.LikeCount,
-		DislikeCount: c.DislikeCount,
-		ViewCount:    c.ViewCount,
-		CreatedAt:    c.CreatedAt,
-		UpdatedAt:    c.UpdatedAt,
+		CommentID:      c.ID,
+		PostID:         c.PostID,
+		UserID:         c.UserID,
+		ParentID:       c.ParentID,
+		Content:        c.Content,
+		ReplyCount:     c.ReplyCount,
+		LikeCount:      c.LikeCount,
+		DislikeCount:   c.DislikeCount,
+		ViewCount:      c.ViewCount,
+		AuthorName:     c.AuthorName,
+		ViewerReaction: string(c.ViewerReaction),
+		CreatedAt:      c.CreatedAt,
+		UpdatedAt:      c.UpdatedAt,
 	}
 }
 

@@ -103,10 +103,6 @@ func (f *fakeUserRepository) DeleteUser(ctx context.Context, q database.Querier,
 	return f.deleteUserFunc(ctx, q, userID)
 }
 
-func (f *fakeUserRepository) ListUsersByAsset(context.Context, database.Querier, shared.AssetType, uuid.UUID) ([]dUser.User, error) {
-	panic("fakeUserRepository: ListUsersByAsset not stubbed")
-}
-
 // fakeAuthRepository implements dAuth.Repository. Only InvalidateSessions is
 // exercised by user.Service (on a password change).
 type fakeAuthRepository struct {
@@ -123,6 +119,10 @@ func (f *fakeAuthRepository) GetRefreshToken(context.Context, database.Querier, 
 
 func (f *fakeAuthRepository) DeleteRefreshToken(context.Context, database.Querier, string) error {
 	panic("fakeAuthRepository: DeleteRefreshToken not stubbed")
+}
+
+func (f *fakeAuthRepository) DeleteExpiredRefreshTokens(context.Context, database.Querier, time.Time) error {
+	panic("fakeAuthRepository: DeleteExpiredRefreshTokens not stubbed")
 }
 
 func (f *fakeAuthRepository) InvalidateSessions(ctx context.Context, q database.Querier, userID uuid.UUID) error {
@@ -380,13 +380,23 @@ func TestService_Delete(t *testing.T) {
 				return nil
 			},
 		}
-		svc := NewService(fakeTransactor{}, userRepo, &fakeAuthRepository{}, noteRepo)
+		var signedOut uuid.UUID
+		authRepo := &fakeAuthRepository{
+			invalidateSessionsFunc: func(_ context.Context, _ database.Querier, userID uuid.UUID) error {
+				signedOut = userID
+				return nil
+			},
+		}
+		svc := NewService(fakeTransactor{}, userRepo, authRepo, noteRepo)
 
 		if err := svc.Delete(ctxWithUser(requesterID), shared.DeleteSoft, requesterID); err != nil {
 			t.Fatalf("Delete() error = %v, want nil", err)
 		}
 		if softDeletedID != requesterID {
 			t.Errorf("SoftDeleteUser called with %v, want %v", softDeletedID, requesterID)
+		}
+		if signedOut != requesterID {
+			t.Errorf("sessions invalidated for %v, want %v (a deleted account must be signed out)", signedOut, requesterID)
 		}
 		if note.Type != dNote.TypeArchive {
 			t.Errorf("note.Type = %q, want %q", note.Type, dNote.TypeArchive)

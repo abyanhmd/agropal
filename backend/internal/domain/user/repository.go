@@ -1,7 +1,6 @@
 package user
 
 import (
-	"agropal/internal/domain/shared"
 	"agropal/internal/infra/database"
 	"context"
 	"time"
@@ -22,5 +21,4 @@ type Repository interface {
 	SoftDeleteUser(ctx context.Context, q database.Querier, userID uuid.UUID, deletedAt time.Time) error
 	DeleteUser(ctx context.Context, q database.Querier, userID uuid.UUID) error
 
-	ListUsersByAsset(ctx context.Context, q database.Querier, assetType shared.AssetType, assetID uuid.UUID) ([]User, error)
 }

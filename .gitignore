@@ -16,3 +16,6 @@ node_modules/
 .next/
 logs/
 .DS_Store
+
+# Personal notes
+git-monorepo-notes.txt

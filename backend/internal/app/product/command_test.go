@@ -17,6 +17,7 @@ func TestProductCommand_ToDomain(t *testing.T) {
 		Name:        shared.Ptr("Tomato"),
 		Description: shared.Ptr("Fresh red tomatoes"),
 		Image:       shared.Ptr("tomato.png"),
+		Unit:        shared.Ptr("kg"),
 	}
 
 	got := cmd.ToDomain(farmID, productID)
@@ -26,6 +27,7 @@ func TestProductCommand_ToDomain(t *testing.T) {
 		Name:        "Tomato",
 		Description: "Fresh red tomatoes",
 		Image:       "tomato.png",
+		Unit:        "kg",
 		FarmID:      farmID,
 	}
 
@@ -38,7 +40,7 @@ func TestProductStockCommand_ToDomain(t *testing.T) {
 	productID := uuid.New()
 	stockID := uuid.New()
 	dateAdded := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
-	movementIn := dProduct.MovementIn
+	movementIn := dProduct.MovementIncome
 
 	cmd := ProductStockCommand{
 		DateAdded: &dateAdded,
@@ -52,7 +54,7 @@ func TestProductStockCommand_ToDomain(t *testing.T) {
 		ID:        stockID,
 		ProductID: productID,
 		DateAdded: dateAdded,
-		Type:      dProduct.MovementIn,
+		Type:      dProduct.MovementIncome,
 		Stock:     42.5,
 	}
 
@@ -69,6 +71,7 @@ func TestProductPriceCommand_ToDomain(t *testing.T) {
 	cmd := ProductPriceCommand{
 		DateAdded: &dateAdded,
 		Price:     shared.Ptr(19.99),
+		Currency:  shared.Ptr("EUR"),
 	}
 
 	got := cmd.ToDomain(productID, priceID)
@@ -78,6 +81,7 @@ func TestProductPriceCommand_ToDomain(t *testing.T) {
 		ProductID: productID,
 		DateAdded: dateAdded,
 		Price:     19.99,
+		Currency:  "EUR",
 	}
 
 	if got != want {

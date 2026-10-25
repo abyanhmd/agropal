@@ -12,6 +12,10 @@ const corsAllowMethods = "GET, POST, PATCH, PUT, DELETE, OPTIONS"
 // sends no Access-Control-Request-Headers to reflect.
 const corsDefaultAllowHeaders = "Authorization, Content-Type"
 
+// TotalCountHeader carries how many items a list filter matches, whatever page was asked for.
+// It is exposed to browsers so a client can work out how many pages there are.
+const TotalCountHeader = "X-Total-Count"
+
 // corsMaxAge caps how long (seconds) a browser may cache a preflight result.
 const corsMaxAge = "600"
 
@@ -98,9 +102,9 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Let the browser's JS read the correlation id off the response
+			// Let the browser's JS read the correlation id and list total off the response
 			// (it is not a CORS-safelisted response header).
-			w.Header().Set("Access-Control-Expose-Headers", RequestIDHeader)
+			w.Header().Set("Access-Control-Expose-Headers", RequestIDHeader+", "+TotalCountHeader)
 
 			next.ServeHTTP(w, r)
 		})

@@ -1,22 +1,24 @@
 package app
 
 import (
+	"context"
 	"agropal/config"
 	aAuth "agropal/internal/app/auth"
 	aFarm "agropal/internal/app/farm"
+	aLocation "agropal/internal/app/location"
 	aPost "agropal/internal/app/post"
 	aProduct "agropal/internal/app/product"
 	aTransaction "agropal/internal/app/transaction"
 	aUser "agropal/internal/app/user"
-	aWeather "agropal/internal/app/weather"
 	dPost "agropal/internal/domain/post"
+	"agropal/internal/domain/shared"
 
 	dAuth "agropal/internal/domain/auth"
 	dFarm "agropal/internal/domain/farm"
+	dLocation "agropal/internal/domain/location"
 	dProduct "agropal/internal/domain/product"
 	dTransaction "agropal/internal/domain/transaction"
 	dUser "agropal/internal/domain/user"
-	dWeather "agropal/internal/domain/weather"
 
 	"agropal/internal/infra/crypto"
 	"agropal/internal/infra/database"
@@ -63,7 +65,7 @@ type Container struct {
 	Auth        *AuthModule
 	User        *UserModule
 	Farm        *FarmModule
-	Weather     *WeatherModule
+	Location    *LocationModule
 	Product     *ProductModule
 	Post        *PostModule
 	Transaction *TransactionModule
@@ -81,9 +83,9 @@ type FarmModule struct {
 	Service    *aFarm.Service
 	Repository *dFarm.Repository
 }
-type WeatherModule struct {
-	Service    *aWeather.Service
-	Repository *dWeather.Repository
+type LocationModule struct {
+	Service    *aLocation.Service
+	Repository *dLocation.Repository
 }
 type ProductModule struct {
 	Service    *aProduct.Service
@@ -111,7 +113,7 @@ func NewContainer(
 	userRepo := persistence.NewUserRepository(t.Logger)
 	noteRepo := persistence.NewNoteRepository(t.Logger)
 	farmRepo := persistence.NewFarmRepository(t.Logger)
-	weatherRepo := persistence.NewWeatherRepository(t.Logger)
+	locationRepo := persistence.NewLocationRepository(t.Logger)
 	productRepo := persistence.NewProductRepository(t.Logger)
 	postRepo := persistence.NewPostRepository(t.Logger)
 	transactionRepo := persistence.NewTransactionRepository(t.Logger)
@@ -119,9 +121,13 @@ func NewContainer(
 	/* Service */
 
 	authService := aAuth.NewService(t.Logger, transactor, generator, jwt, t.Redis, t.Queue, authRepo, userRepo)
+	if t.Config.Auth.ExposeCodes {
+		authService.ExposeCodes(true)
+		t.Logger.Warn(context.Background(), shared.System, "EXPOSE_CODES is on: one-time codes are returned in API responses. Development only.")
+	}
 	userService := aUser.NewService(transactor, userRepo, authRepo, noteRepo)
 	farmService := aFarm.NewService(transactor, userRepo, farmRepo)
-	weatherService := aWeather.NewService(transactor, userRepo, farmRepo, weatherRepo)
+	locationService := aLocation.NewService(transactor, userRepo, farmRepo, locationRepo)
 	productService := aProduct.NewService(transactor, userRepo, farmRepo, productRepo, noteRepo)
 	postService := aPost.NewService(transactor, userRepo, postRepo, noteRepo)
 	transactionService := aTransaction.NewService(transactor, userRepo, farmRepo, productRepo, transactionRepo)
@@ -132,7 +138,7 @@ func NewContainer(
 		Auth:        &AuthModule{Service: authService},
 		User:        &UserModule{Service: userService},
 		Farm:        &FarmModule{Service: farmService},
-		Weather:     &WeatherModule{Service: weatherService},
+		Location:    &LocationModule{Service: locationService},
 		Product:     &ProductModule{Service: productService},
 		Post:        &PostModule{Service: postService},
 		Transaction: &TransactionModule{Service: transactionService},

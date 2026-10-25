@@ -24,17 +24,6 @@ type UpdateUserCommand struct {
 	Avatar   *string
 }
 
-type LoginCommand struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=8"`
-}
-
-type ChangePasswordCommand struct {
-	Email       string `json:"email" validate:"required,email"`
-	OldPassword string `json:"password" validate:"required,min=8"`
-	NewPassword string `json:"new_password" validate:"required,min=8"`
-}
-
 /* ==================== Mapping ====================== */
 
 func (c UserCommand) ToDomain() dUser.User {

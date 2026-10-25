@@ -13,9 +13,10 @@ type PostCommand struct {
 }
 
 type PostCommentCommand struct {
-	PostID  uuid.UUID
-	Content string
-	UserID  uuid.UUID
+	PostID   uuid.UUID
+	Content  string
+	UserID   uuid.UUID
+	ParentID *uuid.UUID
 }
 
 type PostEngagementCommand struct {
@@ -35,9 +36,10 @@ func (c PostCommand) ToDomain(postID, userID uuid.UUID) dPost.Post {
 
 func (c PostCommentCommand) ToDomain(userID uuid.UUID) dPost.PostComment {
 	return dPost.PostComment{
-		PostID:  c.PostID,
-		Content: c.Content,
-		UserID:  userID,
+		PostID:   c.PostID,
+		Content:  c.Content,
+		UserID:   userID,
+		ParentID: c.ParentID,
 	}
 }
 

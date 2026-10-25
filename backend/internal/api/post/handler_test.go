@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -83,10 +84,6 @@ func (f *fakeUserRepository) DeleteUser(context.Context, database.Querier, uuid.
 	panic("fakeUserRepository: DeleteUser not stubbed")
 }
 
-func (f *fakeUserRepository) ListUsersByAsset(context.Context, database.Querier, shared.AssetType, uuid.UUID) ([]dUser.User, error) {
-	panic("fakeUserRepository: ListUsersByAsset not stubbed")
-}
-
 // fakePostRepository implements dPost.Repository. Only the methods the
 // handler tests exercise are wired to a *Func field; everything else panics
 // if called.
@@ -95,8 +92,12 @@ type fakePostRepository struct {
 	findPostByIDFunc       func(ctx context.Context, q database.Querier, id uuid.UUID) (dPost.Post, error)
 	listPostsFunc          func(ctx context.Context, q database.Querier, filter dPost.FilterQuery) ([]dPost.Post, error)
 	addCommentFunc         func(ctx context.Context, q database.Querier, c dPost.PostComment) error
-	listCommentRepliesFunc func(ctx context.Context, q database.Querier, parentID uuid.UUID, filter dPost.FilterQuery) ([]dPost.PostComment, error)
+	countPostsFunc         func(ctx context.Context, q database.Querier, filter dPost.FilterQuery) (int, error)
+	findCommentByIDFunc    func(ctx context.Context, q database.Querier, id uuid.UUID) (dPost.PostComment, error)
+	listPostCommentsFunc   func(ctx context.Context, q database.Querier, postID uuid.UUID) ([]dPost.PostComment, error)
 	addEngagementFunc      func(ctx context.Context, q database.Querier, e dPost.PostEngagement) error
+	removeReactionFunc     func(ctx context.Context, q database.Querier, assetType dPost.PostType, assetID, userID uuid.UUID) error
+	listReactionsFunc      func(ctx context.Context, q database.Querier, userID, postID uuid.UUID) (map[uuid.UUID]dPost.ActionType, error)
 }
 
 func (f *fakePostRepository) CreatePost(ctx context.Context, q database.Querier, p dPost.Post) error {
@@ -143,11 +144,47 @@ func (f *fakePostRepository) ListTopLevelComments(context.Context, database.Quer
 	panic("fakePostRepository: ListTopLevelComments not stubbed")
 }
 
-func (f *fakePostRepository) ListCommentReplies(ctx context.Context, q database.Querier, parentID uuid.UUID, filter dPost.FilterQuery) ([]dPost.PostComment, error) {
-	if f.listCommentRepliesFunc == nil {
-		panic("fakePostRepository: listCommentRepliesFunc not stubbed")
+func (f *fakePostRepository) ListCommentReplies(context.Context, database.Querier, uuid.UUID, dPost.FilterQuery) ([]dPost.PostComment, error) {
+	panic("fakePostRepository: ListCommentReplies not stubbed")
+}
+
+func (f *fakePostRepository) CountPosts(ctx context.Context, q database.Querier, filter dPost.FilterQuery) (int, error) {
+	if f.countPostsFunc == nil {
+		panic("fakePostRepository: countPostsFunc not stubbed")
 	}
-	return f.listCommentRepliesFunc(ctx, q, parentID, filter)
+	return f.countPostsFunc(ctx, q, filter)
+}
+
+func (f *fakePostRepository) ListPostAuthors(context.Context, database.Querier) ([]dPost.PostAuthor, error) {
+	panic("fakePostRepository: ListPostAuthors not stubbed")
+}
+
+func (f *fakePostRepository) FindCommentByID(ctx context.Context, q database.Querier, id uuid.UUID) (dPost.PostComment, error) {
+	if f.findCommentByIDFunc == nil {
+		panic("fakePostRepository: findCommentByIDFunc not stubbed")
+	}
+	return f.findCommentByIDFunc(ctx, q, id)
+}
+
+func (f *fakePostRepository) ListPostComments(ctx context.Context, q database.Querier, postID uuid.UUID) ([]dPost.PostComment, error) {
+	if f.listPostCommentsFunc == nil {
+		panic("fakePostRepository: listPostCommentsFunc not stubbed")
+	}
+	return f.listPostCommentsFunc(ctx, q, postID)
+}
+
+func (f *fakePostRepository) RemoveReaction(ctx context.Context, q database.Querier, assetType dPost.PostType, assetID, userID uuid.UUID) error {
+	if f.removeReactionFunc == nil {
+		panic("fakePostRepository: removeReactionFunc not stubbed")
+	}
+	return f.removeReactionFunc(ctx, q, assetType, assetID, userID)
+}
+
+func (f *fakePostRepository) ListReactions(ctx context.Context, q database.Querier, userID, postID uuid.UUID) (map[uuid.UUID]dPost.ActionType, error) {
+	if f.listReactionsFunc == nil {
+		panic("fakePostRepository: listReactionsFunc not stubbed")
+	}
+	return f.listReactionsFunc(ctx, q, userID, postID)
 }
 
 func (f *fakePostRepository) AddEngagement(ctx context.Context, q database.Querier, e dPost.PostEngagement) error {
@@ -249,6 +286,13 @@ func TestHandler_Create(t *testing.T) {
 		if envelope.Info.Key != dPost.SuccessCreated.String() {
 			t.Errorf("Info.Key = %q, want %q", envelope.Info.Key, dPost.SuccessCreated.String())
 		}
+		data, _ := envelope.Data.(map[string]any)
+		if id, _ := data["post_id"].(string); id == "" {
+			t.Errorf("data.post_id is empty, want the new post's id (data=%v)", envelope.Data)
+		}
+		if slug, _ := data["slug"].(string); !strings.HasPrefix(slug, "hello-") {
+			t.Errorf("data.slug = %q, want a slug built from the title", slug)
+		}
 	})
 
 	t.Run("Invalid JSON Body", func(t *testing.T) {
@@ -316,7 +360,7 @@ func TestHandler_GetOne(t *testing.T) {
 			findPostByIDFunc: func(_ context.Context, _ database.Querier, id uuid.UUID) (dPost.Post, error) {
 				return dPost.Post{ID: id, Title: "Hello", Content: "World"}, nil
 			},
-			listCommentRepliesFunc: func(context.Context, database.Querier, uuid.UUID, dPost.FilterQuery) ([]dPost.PostComment, error) {
+			listPostCommentsFunc: func(context.Context, database.Querier, uuid.UUID) ([]dPost.PostComment, error) {
 				return nil, nil
 			},
 		}
@@ -383,8 +427,9 @@ func TestHandler_GetMany(t *testing.T) {
 		postID := uuid.New()
 		postRepo := &fakePostRepository{
 			listPostsFunc: func(context.Context, database.Querier, dPost.FilterQuery) ([]dPost.Post, error) {
-				return []dPost.Post{{ID: postID, Title: "Hello"}}, nil
+				return []dPost.Post{{ID: postID, Title: "Hello", AuthorName: "Jane"}}, nil
 			},
+			countPostsFunc: func(context.Context, database.Querier, dPost.FilterQuery) (int, error) { return 42, nil },
 		}
 		h := newTestHandler(&fakeUserRepository{}, postRepo, &fakeNoteRepository{})
 
@@ -396,12 +441,80 @@ func TestHandler_GetMany(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusOK, rec.Body.String())
 		}
+		if got := rec.Header().Get("X-Total-Count"); got != "42" {
+			t.Errorf("X-Total-Count = %q, want %q", got, "42")
+		}
 		var got []response.PostResponse
 		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 			t.Fatalf("failed to decode response body %q: %v", rec.Body.String(), err)
 		}
 		if len(got) != 1 || got[0].PostID != postID {
 			t.Errorf("got %+v, want a single post with ID %v", got, postID)
+		}
+		if got[0].AuthorName != "Jane" {
+			t.Errorf("AuthorName = %q, want %q", got[0].AuthorName, "Jane")
+		}
+	})
+
+	t.Run("Rejects A Sort Outside The Allowed Columns", func(t *testing.T) {
+		for _, query := range []string{
+			"sort_column=created_at;DROP TABLE posts&sort_dir=asc",
+			"sort_column=password&sort_dir=asc",
+			"sort_column=created_at&sort_dir=sideways",
+			"sort_column=created_at",
+		} {
+			h := newTestHandler(&fakeUserRepository{}, &fakePostRepository{}, &fakeNoteRepository{})
+
+			req := httptest.NewRequest(http.MethodGet, "/post", nil)
+			req.URL.RawQuery = query
+			rec := httptest.NewRecorder()
+
+			h.GetMany(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("%q: status = %d, want %d (body=%s)", query, rec.Code, http.StatusBadRequest, rec.Body.String())
+			}
+		}
+	})
+
+	t.Run("Passes Filters, Search And A Clamped Page To The Repository", func(t *testing.T) {
+		authorA, authorB := uuid.New(), uuid.New()
+		var listed, counted dPost.FilterQuery
+		postRepo := &fakePostRepository{
+			listPostsFunc: func(_ context.Context, _ database.Querier, f dPost.FilterQuery) ([]dPost.Post, error) {
+				listed = f
+				return nil, nil
+			},
+			countPostsFunc: func(_ context.Context, _ database.Querier, f dPost.FilterQuery) (int, error) {
+				counted = f
+				return 0, nil
+			},
+		}
+		h := newTestHandler(&fakeUserRepository{}, postRepo, &fakeNoteRepository{})
+
+		req := httptest.NewRequest(http.MethodGet, "/post", nil)
+		req.URL.RawQuery = "user_id=" + authorA.String() + "&user_id=" + authorB.String() + "&q=%20soil%20&limit=9999&offset=-5&sort_column=like_count&sort_dir=desc"
+		rec := httptest.NewRecorder()
+
+		h.GetMany(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusOK, rec.Body.String())
+		}
+		if len(listed.UserIDs) != 2 || listed.UserIDs[0] != authorA || listed.UserIDs[1] != authorB {
+			t.Errorf("UserIDs = %v, want [%v %v]", listed.UserIDs, authorA, authorB)
+		}
+		if listed.Search == nil || *listed.Search != "soil" {
+			t.Errorf("Search = %v, want %q", listed.Search, "soil")
+		}
+		if listed.Pagination == nil || listed.Pagination.Limit != 100 || listed.Pagination.Offset != 0 {
+			t.Errorf("Pagination = %+v, want limit 100 and offset 0", listed.Pagination)
+		}
+		if listed.Sorting == nil || listed.Sorting.Column != "like_count" || listed.Sorting.Dir != "desc" {
+			t.Errorf("Sorting = %+v, want like_count desc", listed.Sorting)
+		}
+		if counted.Search == nil || len(counted.UserIDs) != 2 {
+			t.Errorf("count filter = %+v, want the same search and authors as the list", counted)
 		}
 	})
 
@@ -597,6 +710,80 @@ func TestHandler_CreateCommentEngagement(t *testing.T) {
 		envelope := decodeEnvelope(t, rec)
 		if envelope.Info.Key != dPost.ErrInvalidCommentID.Error() {
 			t.Errorf("Info.Key = %q, want %q", envelope.Info.Key, dPost.ErrInvalidCommentID.Error())
+		}
+	})
+}
+
+/* ==================== Tests: DeleteEngagement ====================== */
+
+func TestHandler_DeleteEngagement(t *testing.T) {
+	userID := uuid.New()
+
+	t.Run("Post reaction is taken back", func(t *testing.T) {
+		postID := uuid.New()
+		called := false
+		postRepo := &fakePostRepository{
+			removeReactionFunc: func(_ context.Context, _ database.Querier, assetType dPost.PostType, assetID, user uuid.UUID) error {
+				called = true
+				if assetType != dPost.TypePost || assetID != postID || user != userID {
+					t.Errorf("RemoveReaction got %v %v %v, want %v %v %v", assetType, assetID, user, dPost.TypePost, postID, userID)
+				}
+				return nil
+			},
+		}
+		h := newTestHandler(&fakeUserRepository{}, postRepo, &fakeNoteRepository{})
+
+		req := withPathValue(jsonRequestWithContext(ctxWithUser(userID), http.MethodDelete, "/post/"+postID.String()+"/engagement", ""), "post_id", postID.String())
+		rec := httptest.NewRecorder()
+
+		h.DeletePostEngagement(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusOK, rec.Body.String())
+		}
+		if key := decodeEnvelope(t, rec).Info.Key; key != dPost.SuccessEngagementDeleted.String() {
+			t.Errorf("Info.Key = %q, want %q", key, dPost.SuccessEngagementDeleted.String())
+		}
+		if !called {
+			t.Error("the repository was not asked to remove the reaction")
+		}
+	})
+
+	t.Run("Comment reaction is taken back", func(t *testing.T) {
+		commentID := uuid.New()
+		postRepo := &fakePostRepository{
+			removeReactionFunc: func(_ context.Context, _ database.Querier, assetType dPost.PostType, assetID, _ uuid.UUID) error {
+				if assetType != dPost.TypeComment || assetID != commentID {
+					t.Errorf("RemoveReaction got %v %v, want %v %v", assetType, assetID, dPost.TypeComment, commentID)
+				}
+				return nil
+			},
+		}
+		h := newTestHandler(&fakeUserRepository{}, postRepo, &fakeNoteRepository{})
+
+		req := withPathValue(jsonRequestWithContext(ctxWithUser(userID), http.MethodDelete, "/comment/"+commentID.String()+"/engagement", ""), "comment_id", commentID.String())
+		rec := httptest.NewRecorder()
+
+		h.DeleteCommentEngagement(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusOK, rec.Body.String())
+		}
+	})
+
+	t.Run("Invalid ids map to 400", func(t *testing.T) {
+		h := newTestHandler(&fakeUserRepository{}, &fakePostRepository{}, &fakeNoteRepository{})
+
+		rec := httptest.NewRecorder()
+		h.DeletePostEngagement(rec, withPathValue(jsonRequestWithContext(ctxWithUser(userID), http.MethodDelete, "/post/x/engagement", ""), "post_id", "x"))
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("post: status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+
+		rec = httptest.NewRecorder()
+		h.DeleteCommentEngagement(rec, withPathValue(jsonRequestWithContext(ctxWithUser(userID), http.MethodDelete, "/comment/x/engagement", ""), "comment_id", "x"))
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("comment: status = %d, want %d", rec.Code, http.StatusBadRequest)
 		}
 	})
 }

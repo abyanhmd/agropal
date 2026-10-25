@@ -4,7 +4,7 @@ Agropal is a backend platform for managing farms and farming activity: farms and
 
 ## Tech Stack
 
-- **Language:** Go 1.24
+- **Language:** Go 1.25
 - **Database:** PostgreSQL (`pgx/v5`, `lib/pq`, `sqlx`)
 - **Cache/Session:** Redis (holds staged registrations, one-time verification codes, and resend cooldowns for the auth flow)
 - **Auth:** JWT (`golang-jwt/jwt/v5`), AES-GCM-encrypted refresh tokens at rest
@@ -40,7 +40,7 @@ backend/
 │   ├── api/                  # HTTP layer, one package per domain
 │   │   ├── auth/             #   register/login (email-code confirmed), refresh, logout, password reset
 │   │   ├── farm/             #   farm CRUD
-│   │   ├── weather/          #   weather locations per farm
+│   │   ├── location/         #   farm locations (lat/long), served under /farm/{farm_id}/location
 │   │   ├── product/          #   products + price/stock history
 │   │   ├── transaction/      #   income/expense transactions
 │   │   ├── post/             #   posts, comments, like/dislike/view engagement
@@ -48,7 +48,7 @@ backend/
 │   │   └── middleware/       #   JWT auth middleware + route registration helper
 │   ├── app/                  # use cases, one package per domain + container.go
 │   ├── domain/                # entities, repository interfaces, error keys
-│   │   ├── auth/ farm/ note/ post/ product/ transaction/ user/ weather/
+│   │   ├── auth/ farm/ note/ post/ product/ transaction/ user/ location/
 │   │   └── shared/           #   context/claims helpers, common error & success keys
 │   ├── infra/
 │   │   ├── crypto/           #   JWT signing/validation, AES-GCM encryption
@@ -75,10 +75,10 @@ Auth uses a two-step email flow. `POST /auth/register` and `POST /auth/login` on
 |---|---|
 | Auth | `POST /auth/register`, `/register/verify`, `/login`, `/login/verify`, `/{purpose}/resend-code`, `/refresh`, `/logout`, `/reset-password/request`, `/reset-password/confirm` |
 | Farm | `POST/GET /farm`, `GET/PATCH/DELETE /farm/{farm_id}` |
-| Weather | `POST/GET /farm/{farm_id}/weather`, `PATCH/DELETE /farm/{farm_id}/weather/{weather_id}` |
+| Location | `POST/GET /farm/{farm_id}/location`, `PATCH/DELETE /farm/{farm_id}/location/{location_id}` |
 | Product | `POST/GET /farm/{farm_id}/product`, `GET/PATCH/DELETE .../product/{product_id}`, plus nested `/price` and `/stock` create+delete |
 | Transaction | `POST/GET/DELETE .../product/{product_id}/transaction`, `GET/PATCH .../transaction/{transaction_id}`, `GET /farm/{farm_id}/transaction`, bulk `DELETE /transaction` and `/transaction/all` |
-| Post | `POST/GET /post`, `GET /post/{post_id}`, `POST /post/{post_id}/comment`, `POST /post/{post_id}/engagement`, `POST /comment/{comment_id}/engagement` |
+| Post | `POST/GET /post`, `GET /post/{post_id}`, `POST /post/{post_id}/comment`, `POST/DELETE /post/{post_id}/engagement`, `POST/DELETE /comment/{comment_id}/engagement` |
 | User | `GET/PATCH/DELETE /user/{user_id}` (or `me`), `PATCH /user/{user_id}/password`, `GET /users` |
 
 ## Response Conventions
@@ -186,15 +186,12 @@ The same steps run in CI on every push and pull request against `master` (`.gith
 - **Auth**: registration and login (both confirmed by a one-time code emailed to the user), refresh-token rotation (AES-GCM encrypted at rest), logout, password reset by emailed code
 - **User**: profile (name/avatar), password change, soft/hard delete, listing users by related asset
 - **Farm**: a user's farms
-- **Weather**: weather-tracked locations (lat/long) attached to a farm
+- **Location**: weather-tracked locations (lat/long) attached to a farm
 - **Product**: a farm's products, with append-only price and stock history
 - **Transaction**: income/expense records against a product
 - **Post**: posts with comments and like/dislike/view engagement, backed by an audit trail in `domain/note`
 
 ## Known Limitations
 
-- Not every mutation has a dedicated success key yet; post/comment engagement endpoints (`POST /post/{post_id}/engagement`, `POST /comment/{comment_id}/engagement`) still return a bare `201` with no body.
-- `app/product`'s `UpdateProduct` records an audit note for changed fields but doesn't yet persist the new values.
 - `boilerplate/*` is scaffolded but empty.
-- `domain/note` has an entity, repository, and migration and is written to as an audit trail, but there is no read API for notes yet.
-- `refresh_tokens` rows are only removed on rotation or logout; a token left to expire on its own is never swept from the table.
+- `domain/note` is a write-only audit trail by design: users, products and posts record notes as they change, and nothing reads them back through the API. Add `app/note` and `api/note` if that is ever wanted.

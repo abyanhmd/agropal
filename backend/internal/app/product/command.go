@@ -2,6 +2,7 @@ package product
 
 import (
 	dProduct "agropal/internal/domain/product"
+	"agropal/internal/domain/shared"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ type ProductCommand struct {
 	Name        *string
 	Description *string
 	Image       *string
+	Unit        *string
 }
 
 type ProductStockCommand struct {
@@ -22,6 +24,7 @@ type ProductStockCommand struct {
 type ProductPriceCommand struct {
 	DateAdded *time.Time
 	Price     *float64
+	Currency  *string
 }
 
 func (c ProductCommand) ToDomain(farmID, productID uuid.UUID) dProduct.Product {
@@ -30,6 +33,7 @@ func (c ProductCommand) ToDomain(farmID, productID uuid.UUID) dProduct.Product {
 		Name:        *c.Name,
 		Description: *c.Description,
 		Image:       *c.Image,
+		Unit:        shared.Str(c.Unit),
 		FarmID:      farmID,
 	}
 }
@@ -50,5 +54,6 @@ func (c ProductPriceCommand) ToDomain(productID, priceID uuid.UUID) dProduct.Pro
 		ProductID: productID,
 		DateAdded: *c.DateAdded,
 		Price:     *c.Price,
+		Currency:  shared.Str(c.Currency),
 	}
 }

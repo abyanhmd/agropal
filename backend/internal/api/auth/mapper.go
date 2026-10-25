@@ -48,6 +48,10 @@ func ToLoginCommand(req request.UserRequest) (aAuth.LoginUserCommand, error) {
 	if req.Email == nil && req.Username == nil {
 		return aAuth.LoginUserCommand{}, dAuth.ErrInvalidCredentials
 	}
+	// Which one identifies the account would be a guess
+	if req.Email != nil && req.Username != nil {
+		return aAuth.LoginUserCommand{}, shared.ErrInvalidRequest
+	}
 	if req.Email != nil && !utils.ValidEmail(*req.Email) {
 		return aAuth.LoginUserCommand{}, dAuth.ErrInvalidEmail
 	}

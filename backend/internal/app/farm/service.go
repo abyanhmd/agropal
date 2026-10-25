@@ -29,20 +29,24 @@ func NewService(
 	}
 }
 
-func (s *Service) Create(ctx context.Context, cmd FarmCommand) error {
+func (s *Service) Create(ctx context.Context, cmd FarmCommand) (uuid.UUID, error) {
 	user, err := s.verifyUser(ctx)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
 	farmID, err := uuid.NewV7()
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	farm := cmd.ToDomain(user.ID)
 	farm.ID = farmID
 
-	return s.farmRepo.CreateFarm(ctx, s.transactor.DB(), farm)
+	if err = s.farmRepo.CreateFarm(ctx, s.transactor.DB(), farm); err != nil {
+		return uuid.Nil, err
+	}
+
+	return farmID, nil
 }
 
 func (s *Service) GetOne(ctx context.Context, farmID uuid.UUID) (dFarm.Farm, error) {
@@ -88,7 +92,9 @@ func (s *Service) Update(ctx context.Context, farmID uuid.UUID, cmd FarmCommand)
 			return shared.ErrForbidden
 		}
 
-		if err = s.farmRepo.UpdateFarm(ctx, q, cmd.ToDomain(farmID)); err != nil {
+		// Start from the stored farm: ToDomain builds a new one, which has no id yet
+		farms.Name = cmd.Name
+		if err = s.farmRepo.UpdateFarm(ctx, q, farms); err != nil {
 			return err
 		}
 		return nil

@@ -31,6 +31,12 @@ func NewRouter(
 			Middlewares: []middleware.HandlerMiddleware{mw.RequirePermission(config.PermGetManyPosts)},
 		},
 		{
+			Path:        "/post/authors",
+			Method:      http.MethodGet,
+			Handler:     handler.GetAuthors,
+			Middlewares: []middleware.HandlerMiddleware{mw.RequirePermission(config.PermGetManyPosts)},
+		},
+		{
 			Path:        "/post/{post_id}",
 			Method:      http.MethodGet,
 			Handler:     handler.GetOne,
@@ -47,6 +53,18 @@ func NewRouter(
 			Method:      http.MethodPost,
 			Handler:     handler.CreatePostEngagement,
 			Middlewares: []middleware.HandlerMiddleware{mw.RequirePermission(config.PermCreatePostEngagement)},
+		},
+		{
+			Path:        "/post/{post_id}/engagement",
+			Method:      http.MethodDelete,
+			Handler:     handler.DeletePostEngagement,
+			Middlewares: []middleware.HandlerMiddleware{mw.RequirePermission(config.PermCreatePostEngagement)},
+		},
+		{
+			Path:        "/comment/{comment_id}/engagement",
+			Method:      http.MethodDelete,
+			Handler:     handler.DeleteCommentEngagement,
+			Middlewares: []middleware.HandlerMiddleware{mw.RequirePermission(config.PermCreateCommentEngagement)},
 		},
 		{
 			Path:        "/comment/{comment_id}/engagement",

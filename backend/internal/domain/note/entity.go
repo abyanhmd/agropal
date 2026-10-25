@@ -1,3 +1,6 @@
+// Package note is a write-only audit trail. Users, products and posts record a note when they are
+// created, changed or removed, and nothing reads the notes back through the API; that is deliberate
+// for now. Reading them would take an app/note service and an api/note router.
 package note
 
 import (

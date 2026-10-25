@@ -25,10 +25,10 @@ func (r *productRepo) CreateProduct(ctx context.Context, q database.Querier, p d
 	query := `
 		INSERT INTO products (
 			product_id, farm_id, name,
-			description, image
+			description, image, unit
 		) VALUES (
 			:product_id, :farm_id, :name,
-			:description, :image
+			:description, :image, :unit
 		);`
 
 	modelProduct := ToProductModel(p)
@@ -45,7 +45,8 @@ func (r *productRepo) UpdateProduct(ctx context.Context, q database.Querier, p d
 		UPDATE products SET
 		    name = :name,
 		    description = :description,
-		    image = :image
+		    image = :image,
+		    unit = :unit
 		WHERE product_id = :product_id;`
 
 	modelProduct := ToProductModel(p)
@@ -197,10 +198,10 @@ func (r *productRepo) AddProductPrice(ctx context.Context, q database.Querier, p
 	query := `
 		INSERT INTO product_prices (
 			price_id, product_id,
-			created_at, price
+			created_at, price, currency
 		) VALUES (
 			:price_id, :product_id,
-			:created_at, :price
+			:created_at, :price, :currency
 		);`
 
 	priceModel := ToPriceModel(p)

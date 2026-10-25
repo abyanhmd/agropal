@@ -13,6 +13,7 @@ type ProductRequest struct {
 	Name        *string `json:"name" validate:"required"`
 	Description *string `json:"description" validate:"required"`
 	Image       *string `json:"image" validate:"required"`
+	Unit        *string `json:"unit" validate:"required,max=50"`
 }
 
 func (p *ProductRequest) ToCommand() aProduct.ProductCommand {
@@ -20,12 +21,13 @@ func (p *ProductRequest) ToCommand() aProduct.ProductCommand {
 		Name:        p.Name,
 		Description: p.Description,
 		Image:       p.Image,
+		Unit:        p.Unit,
 	}
 }
 
 type ProductStockRequest struct {
 	DateAdded *time.Time `json:"date_added" validate:"required"`
-	Type      *string    `json:"type" validate:"required,oneof=IN OUT"`
+	Type      *string    `json:"type" validate:"required,oneof=INCOME EXPENSE"`
 	Stock     *float64   `json:"stock" validate:"required,gt=0"`
 }
 
@@ -46,11 +48,13 @@ func (p *ProductStockRequest) ToCommand() aProduct.ProductStockCommand {
 type ProductPriceRequest struct {
 	DateAdded *time.Time `json:"date_added" validate:"required"`
 	Price     *float64   `json:"price" validate:"required,gt=0"`
+	Currency  *string    `json:"currency" validate:"required,iso4217"`
 }
 
 func (p *ProductPriceRequest) ToCommand() aProduct.ProductPriceCommand {
 	return aProduct.ProductPriceCommand{
 		DateAdded: p.DateAdded,
 		Price:     p.Price,
+		Currency:  p.Currency,
 	}
 }

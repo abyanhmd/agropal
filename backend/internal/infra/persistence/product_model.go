@@ -13,6 +13,7 @@ type ProductModel struct {
 	Name        string    `db:"name"`
 	Description string    `db:"description"`
 	Image       string    `db:"image"`
+	Unit        string    `db:"unit"`
 }
 
 type ProductStockModel struct {
@@ -28,6 +29,7 @@ type ProductPriceModel struct {
 	ProductID uuid.UUID `db:"product_id"`
 	CreatedAt time.Time `db:"created_at"`
 	Price     float64   `db:"price"`
+	Currency  string    `db:"currency"`
 }
 
 func ToProductModel(domain dProduct.Product) ProductModel {
@@ -37,6 +39,7 @@ func ToProductModel(domain dProduct.Product) ProductModel {
 		Name:        domain.Name,
 		Description: domain.Description,
 		Image:       domain.Image,
+		Unit:        domain.Unit,
 	}
 }
 
@@ -56,6 +59,7 @@ func ToPriceModel(domain dProduct.ProductPrice) ProductPriceModel {
 		ProductID: domain.ProductID,
 		CreatedAt: domain.DateAdded,
 		Price:     domain.Price,
+		Currency:  domain.Currency,
 	}
 }
 
@@ -66,6 +70,7 @@ func (m ProductModel) ToDomain() dProduct.Product {
 		Name:        m.Name,
 		Description: m.Description,
 		Image:       m.Image,
+		Unit:        m.Unit,
 	}
 }
 
@@ -85,5 +90,6 @@ func (m ProductPriceModel) ToDomain() dProduct.ProductPrice {
 		ProductID: m.ProductID,
 		DateAdded: m.CreatedAt,
 		Price:     m.Price,
+		Currency:  m.Currency,
 	}
 }

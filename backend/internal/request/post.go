@@ -21,13 +21,15 @@ func (r *PostRequest) ToCommand(userID uuid.UUID) aPost.PostCommand {
 }
 
 type PostCommentRequest struct {
-	Content string `json:"content" validate:"required"`
+	Content  string     `json:"content" validate:"required"`
+	ParentID *uuid.UUID `json:"parent_id"` // the comment being answered; omitted for a top-level comment
 }
 
 func (r *PostCommentRequest) ToCommand(postID uuid.UUID) aPost.PostCommentCommand {
 	return aPost.PostCommentCommand{
-		PostID:  postID,
-		Content: r.Content,
+		PostID:   postID,
+		Content:  r.Content,
+		ParentID: r.ParentID,
 	}
 }
 

@@ -3,13 +3,13 @@ package response
 import (
 	dAuth "agropal/internal/domain/auth"
 	dFarm "agropal/internal/domain/farm"
+	dLocation "agropal/internal/domain/location"
 	dNote "agropal/internal/domain/note"
 	dPost "agropal/internal/domain/post"
 	dProduct "agropal/internal/domain/product"
 	"agropal/internal/domain/shared"
 	dTransaction "agropal/internal/domain/transaction"
 	dUser "agropal/internal/domain/user"
-	dWeather "agropal/internal/domain/weather"
 )
 
 var SuccessRegistry = map[shared.SuccessKey]ResponseDetail{
@@ -45,6 +45,9 @@ var SuccessRegistry = map[shared.SuccessKey]ResponseDetail{
 	dPost.SuccessCommentUpdated: {HTTPCode: 200, Message: "The comment was updated successfully."}, // "POST.COMMENT_UPDATE_SUCCESS"
 	dPost.SuccessCommentDeleted: {HTTPCode: 200, Message: "The comment was deleted successfully."}, // "POST.COMMENT_DELETE_SUCCESS"
 
+	dPost.SuccessEngagementCreated: {HTTPCode: 201, Message: "The engagement was recorded successfully."}, // "POST.ENGAGEMENT_CREATE_SUCCESS"
+	dPost.SuccessEngagementDeleted: {HTTPCode: 200, Message: "The reaction was removed successfully."},   // "POST.ENGAGEMENT_DELETE_SUCCESS"
+
 	// PRODUCT
 	dProduct.SuccessCreated: {HTTPCode: 201, Message: "The product was created successfully."}, // "PRODUCT.CREATE_SUCCESS"
 	dProduct.SuccessUpdated: {HTTPCode: 200, Message: "The product was updated successfully."}, // "PRODUCT.UPDATE_SUCCESS"
@@ -65,8 +68,8 @@ var SuccessRegistry = map[shared.SuccessKey]ResponseDetail{
 	dUser.SuccessUpdated: {HTTPCode: 200, Message: "The user was updated successfully."}, // "USER.UPDATE_SUCCESS"
 	dUser.SuccessDeleted: {HTTPCode: 200, Message: "The user was deleted successfully."}, // "USER.DELETE_SUCCESS"
 
-	// WEATHER
-	dWeather.SuccessCreated: {HTTPCode: 201, Message: "The weather data was created successfully."}, // "WEATHER.CREATE_SUCCESS"
-	dWeather.SuccessUpdated: {HTTPCode: 200, Message: "The weather data was updated successfully."}, // "WEATHER.UPDATE_SUCCESS"
-	dWeather.SuccessDeleted: {HTTPCode: 200, Message: "The weather data was deleted successfully."}, // "WEATHER.DELETE_SUCCESS"
+	// LOCATION
+	dLocation.SuccessCreated: {HTTPCode: 201, Message: "The location was created successfully."}, // "LOCATION.CREATE_SUCCESS"
+	dLocation.SuccessUpdated: {HTTPCode: 200, Message: "The location was updated successfully."}, // "LOCATION.UPDATE_SUCCESS"
+	dLocation.SuccessDeleted: {HTTPCode: 200, Message: "The location was deleted successfully."}, // "LOCATION.DELETE_SUCCESS"
 }

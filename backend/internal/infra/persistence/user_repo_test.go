@@ -246,32 +246,3 @@ func TestUserRepository_DeleteUser(t *testing.T) {
 		t.Errorf("DeleteUser() for a nonexistent user error = %v, want %v", err, dUser.ErrNotFound)
 	}
 }
-
-// TestUserRepository_ListUsersByAsset_All only exercises the assetID ==
-// uuid.Nil branch (list everyone), which is the one part of
-// ListUsersByAsset that doesn't depend on the {assetType}_id column
-// guessing in the non-Nil branch - users has no farm_id/product_id/etc.
-// column for any asset type, so that branch needs a real design decision
-// (a join through the owning table) rather than a mechanical fix.
-func TestUserRepository_ListUsersByAsset_All(t *testing.T) {
-	if testDB == nil {
-		t.Skip("no test database available (see main_test.go)")
-	}
-	ctx := context.Background()
-	repo := NewUserRepository(testLogger)
-	userA := newTestUser()
-	userB := newTestUser()
-	for _, u := range []dUser.User{userA, userB} {
-		if err := repo.CreateUser(ctx, testDB, u); err != nil {
-			t.Fatalf("CreateUser() error = %v, want nil", err)
-		}
-	}
-
-	got, err := repo.ListUsersByAsset(ctx, testDB, "", uuid.Nil)
-	if err != nil {
-		t.Fatalf("ListUsersByAsset() error = %v, want nil", err)
-	}
-	if len(got) < 2 {
-		t.Errorf("ListUsersByAsset() returned %d users, want at least 2", len(got))
-	}
-}

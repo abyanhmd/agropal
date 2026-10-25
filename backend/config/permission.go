@@ -40,8 +40,8 @@ const (
 	PermDeleteUser         Permission = "user:delete"
 	PermGetManyUsers       Permission = "user:get_many"
 
-	PermCreateWeatherLocation      Permission = "weather:create_location"
-	PermGetWeatherLocationByFarmID Permission = "weather:get_location_by_farm_id"
-	PermUpdateWeatherLocation      Permission = "weather:update_location"
-	PermDeleteWeatherLocation      Permission = "weather:delete_location"
+	PermCreateLocation      Permission = "location:create"
+	PermGetLocationByFarmID Permission = "location:get_by_farm_id"
+	PermUpdateLocation      Permission = "location:update"
+	PermDeleteLocation      Permission = "location:delete"
 )

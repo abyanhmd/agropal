@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -80,10 +81,6 @@ func (f *fakeUserRepository) DeleteUser(context.Context, database.Querier, uuid.
 	panic("fakeUserRepository: DeleteUser not stubbed")
 }
 
-func (f *fakeUserRepository) ListUsersByAsset(context.Context, database.Querier, shared.AssetType, uuid.UUID) ([]dUser.User, error) {
-	panic("fakeUserRepository: ListUsersByAsset not stubbed")
-}
-
 // fakePostRepository implements dPost.Repository. Only the methods
 // post.Service actually calls are wired to a *Func field; everything else
 // panics if called.
@@ -92,8 +89,12 @@ type fakePostRepository struct {
 	findPostByIDFunc       func(ctx context.Context, q database.Querier, id uuid.UUID) (dPost.Post, error)
 	listPostsFunc          func(ctx context.Context, q database.Querier, filter dPost.FilterQuery) ([]dPost.Post, error)
 	addCommentFunc         func(ctx context.Context, q database.Querier, c dPost.PostComment) error
-	listCommentRepliesFunc func(ctx context.Context, q database.Querier, parentID uuid.UUID, filter dPost.FilterQuery) ([]dPost.PostComment, error)
+	countPostsFunc         func(ctx context.Context, q database.Querier, filter dPost.FilterQuery) (int, error)
+	findCommentByIDFunc    func(ctx context.Context, q database.Querier, id uuid.UUID) (dPost.PostComment, error)
+	listPostCommentsFunc   func(ctx context.Context, q database.Querier, postID uuid.UUID) ([]dPost.PostComment, error)
 	addEngagementFunc      func(ctx context.Context, q database.Querier, e dPost.PostEngagement) error
+	removeReactionFunc     func(ctx context.Context, q database.Querier, assetType dPost.PostType, assetID, userID uuid.UUID) error
+	listReactionsFunc      func(ctx context.Context, q database.Querier, userID, postID uuid.UUID) (map[uuid.UUID]dPost.ActionType, error)
 }
 
 func (f *fakePostRepository) CreatePost(ctx context.Context, q database.Querier, p dPost.Post) error {
@@ -140,11 +141,47 @@ func (f *fakePostRepository) ListTopLevelComments(context.Context, database.Quer
 	panic("fakePostRepository: ListTopLevelComments not stubbed")
 }
 
-func (f *fakePostRepository) ListCommentReplies(ctx context.Context, q database.Querier, parentID uuid.UUID, filter dPost.FilterQuery) ([]dPost.PostComment, error) {
-	if f.listCommentRepliesFunc == nil {
-		panic("fakePostRepository: listCommentRepliesFunc not stubbed")
+func (f *fakePostRepository) ListCommentReplies(context.Context, database.Querier, uuid.UUID, dPost.FilterQuery) ([]dPost.PostComment, error) {
+	panic("fakePostRepository: ListCommentReplies not stubbed")
+}
+
+func (f *fakePostRepository) CountPosts(ctx context.Context, q database.Querier, filter dPost.FilterQuery) (int, error) {
+	if f.countPostsFunc == nil {
+		panic("fakePostRepository: countPostsFunc not stubbed")
 	}
-	return f.listCommentRepliesFunc(ctx, q, parentID, filter)
+	return f.countPostsFunc(ctx, q, filter)
+}
+
+func (f *fakePostRepository) ListPostAuthors(context.Context, database.Querier) ([]dPost.PostAuthor, error) {
+	panic("fakePostRepository: ListPostAuthors not stubbed")
+}
+
+func (f *fakePostRepository) FindCommentByID(ctx context.Context, q database.Querier, id uuid.UUID) (dPost.PostComment, error) {
+	if f.findCommentByIDFunc == nil {
+		panic("fakePostRepository: findCommentByIDFunc not stubbed")
+	}
+	return f.findCommentByIDFunc(ctx, q, id)
+}
+
+func (f *fakePostRepository) ListPostComments(ctx context.Context, q database.Querier, postID uuid.UUID) ([]dPost.PostComment, error) {
+	if f.listPostCommentsFunc == nil {
+		panic("fakePostRepository: listPostCommentsFunc not stubbed")
+	}
+	return f.listPostCommentsFunc(ctx, q, postID)
+}
+
+func (f *fakePostRepository) RemoveReaction(ctx context.Context, q database.Querier, assetType dPost.PostType, assetID, userID uuid.UUID) error {
+	if f.removeReactionFunc == nil {
+		panic("fakePostRepository: removeReactionFunc not stubbed")
+	}
+	return f.removeReactionFunc(ctx, q, assetType, assetID, userID)
+}
+
+func (f *fakePostRepository) ListReactions(ctx context.Context, q database.Querier, userID, postID uuid.UUID) (map[uuid.UUID]dPost.ActionType, error) {
+	if f.listReactionsFunc == nil {
+		panic("fakePostRepository: listReactionsFunc not stubbed")
+	}
+	return f.listReactionsFunc(ctx, q, userID, postID)
 }
 
 func (f *fakePostRepository) AddEngagement(ctx context.Context, q database.Querier, e dPost.PostEngagement) error {
@@ -219,12 +256,22 @@ func TestService_CreatePost(t *testing.T) {
 		}
 		svc := NewService(fakeTransactor{}, userRepo, postRepo, noteRepo)
 
-		cmd := PostCommand{Title: "Hello", Content: "World", UserID: selfID}
-		if err := svc.CreatePost(ctxWithUser(selfID), cmd); err != nil {
+		cmd := PostCommand{Title: "Hello, World!", Content: "World", UserID: selfID}
+		returned, err := svc.CreatePost(ctxWithUser(selfID), cmd)
+		if err != nil {
 			t.Fatalf("CreatePost() error = %v, want nil", err)
 		}
-		if createdPost.UserID != selfID || createdPost.Title != "Hello" {
-			t.Errorf("createdPost = %+v, want UserID=%v Title=Hello", createdPost, selfID)
+		if returned.ID != createdPost.ID || returned.Slug != createdPost.Slug {
+			t.Errorf("CreatePost() = %v %q, want the stored post %v %q", returned.ID, returned.Slug, createdPost.ID, createdPost.Slug)
+		}
+		if !strings.HasPrefix(createdPost.Slug, "hello-world-") {
+			t.Errorf("Slug = %q, want it built from the title", createdPost.Slug)
+		}
+		if time.Since(createdPost.CreatedAt) > time.Minute || createdPost.CreatedAt.IsZero() {
+			t.Errorf("CreatedAt = %v, want the time of creation", createdPost.CreatedAt)
+		}
+		if createdPost.UserID != selfID || createdPost.Title != "Hello, World!" {
+			t.Errorf("createdPost = %+v, want UserID=%v Title=\"Hello, World!\"", createdPost, selfID)
 		}
 		if createdPost.ID == uuid.Nil {
 			t.Error("createdPost.ID is zero, want a generated UUID")
@@ -249,7 +296,7 @@ func TestService_CreatePost(t *testing.T) {
 		svc := NewService(fakeTransactor{}, userRepo, postRepo, &fakeNoteRepository{})
 
 		cmd := PostCommand{Title: "Hello", Content: "World", UserID: otherID}
-		err := svc.CreatePost(ctxWithUser(selfID), cmd)
+		_, err := svc.CreatePost(ctxWithUser(selfID), cmd)
 		if !errors.Is(err, shared.ErrForbidden) {
 			t.Errorf("CreatePost() error = %v, want %v", err, shared.ErrForbidden)
 		}
@@ -276,7 +323,7 @@ func TestService_CreatePost(t *testing.T) {
 		svc := NewService(fakeTransactor{}, userRepo, postRepo, noteRepo)
 
 		cmd := PostCommand{Title: "Hello", Content: "World", UserID: otherID}
-		err := svc.CreatePost(ctxWithUserAndRole(adminID, config.RoleAdmin), cmd)
+		_, err := svc.CreatePost(ctxWithUserAndRole(adminID, config.RoleAdmin), cmd)
 		if err != nil {
 			t.Fatalf("CreatePost() error = %v, want nil", err)
 		}
@@ -300,7 +347,7 @@ func TestService_CreatePost(t *testing.T) {
 		svc := NewService(fakeTransactor{}, userRepo, postRepo, &fakeNoteRepository{})
 
 		cmd := PostCommand{Title: "Hello", Content: "World", UserID: selfID}
-		err := svc.CreatePost(ctxWithUser(selfID), cmd)
+		_, err := svc.CreatePost(ctxWithUser(selfID), cmd)
 		if !errors.Is(err, wantErr) {
 			t.Errorf("CreatePost() error = %v, want %v", err, wantErr)
 		}
@@ -318,13 +365,13 @@ func TestService_GetOnePost(t *testing.T) {
 		findPostByIDFunc: func(context.Context, database.Querier, uuid.UUID) (dPost.Post, error) {
 			return want, nil
 		},
-		listCommentRepliesFunc: func(context.Context, database.Querier, uuid.UUID, dPost.FilterQuery) ([]dPost.PostComment, error) {
+		listPostCommentsFunc: func(context.Context, database.Querier, uuid.UUID) ([]dPost.PostComment, error) {
 			return wantComments, nil
 		},
 	}
 	svc := NewService(fakeTransactor{}, &fakeUserRepository{}, postRepo, &fakeNoteRepository{})
 
-	got, err := svc.GetOnePost(context.Background(), postID, dPost.FilterQuery{})
+	got, err := svc.GetOnePost(context.Background(), postID)
 	if err != nil {
 		t.Fatalf("GetOnePost() error = %v, want nil", err)
 	}
@@ -371,7 +418,7 @@ func TestService_CreatePostComment(t *testing.T) {
 	svc := NewService(fakeTransactor{}, &fakeUserRepository{}, postRepo, &fakeNoteRepository{})
 
 	cmd := PostCommentCommand{PostID: postID, Content: "Nice post!"}
-	if err := svc.CreatePostComment(ctxWithUser(userID), cmd); err != nil {
+	if _, err := svc.CreatePostComment(ctxWithUser(userID), cmd); err != nil {
 		t.Fatalf("CreatePostComment() error = %v, want nil", err)
 	}
 
@@ -425,8 +472,145 @@ func TestService_CreatePostEngagement(t *testing.T) {
 func TestService_verifyAccess_MissingRequester(t *testing.T) {
 	svc := NewService(fakeTransactor{}, &fakeUserRepository{}, &fakePostRepository{}, &fakeNoteRepository{})
 
-	err := svc.CreatePost(context.Background(), PostCommand{Title: "x", Content: "y"})
+	_, err := svc.CreatePost(context.Background(), PostCommand{Title: "x", Content: "y"})
 	if !errors.Is(err, dUser.ErrInvalidUserID) {
 		t.Errorf("CreatePost() error = %v, want %v", err, dUser.ErrInvalidUserID)
+	}
+}
+
+/* ==================== Tests: replies, totals, authors ==================== */
+
+func TestService_CreatePostComment_Reply(t *testing.T) {
+	userID := uuid.New()
+	postID := uuid.New()
+	parentID := uuid.New()
+
+	newSvc := func(parent dPost.PostComment, findErr error, added *dPost.PostComment) *Service {
+		return NewService(fakeTransactor{}, &fakeUserRepository{}, &fakePostRepository{
+			findCommentByIDFunc: func(context.Context, database.Querier, uuid.UUID) (dPost.PostComment, error) {
+				return parent, findErr
+			},
+			addCommentFunc: func(_ context.Context, _ database.Querier, c dPost.PostComment) error {
+				*added = c
+				return nil
+			},
+		}, &fakeNoteRepository{})
+	}
+
+	t.Run("stores the parent of a reply on the same post", func(t *testing.T) {
+		var added dPost.PostComment
+		svc := newSvc(dPost.PostComment{ID: parentID, PostID: postID}, nil, &added)
+
+		cmd := PostCommentCommand{PostID: postID, Content: "Agreed", ParentID: &parentID}
+		if _, err := svc.CreatePostComment(ctxWithUser(userID), cmd); err != nil {
+			t.Fatalf("CreatePostComment() error = %v, want nil", err)
+		}
+		if added.ParentID == nil || *added.ParentID != parentID {
+			t.Errorf("added.ParentID = %v, want %v", added.ParentID, parentID)
+		}
+	})
+
+	t.Run("rejects a parent on another post", func(t *testing.T) {
+		var added dPost.PostComment
+		svc := newSvc(dPost.PostComment{ID: parentID, PostID: uuid.New()}, nil, &added)
+
+		cmd := PostCommentCommand{PostID: postID, Content: "Agreed", ParentID: &parentID}
+		if _, err := svc.CreatePostComment(ctxWithUser(userID), cmd); !errors.Is(err, dPost.ErrInvalidParentID) {
+			t.Errorf("CreatePostComment() error = %v, want %v", err, dPost.ErrInvalidParentID)
+		}
+		if added.ID != uuid.Nil {
+			t.Error("a comment was stored despite the invalid parent")
+		}
+	})
+
+	t.Run("rejects a parent that does not exist", func(t *testing.T) {
+		var added dPost.PostComment
+		svc := newSvc(dPost.PostComment{}, dPost.ErrCommentNotFound, &added)
+
+		cmd := PostCommentCommand{PostID: postID, Content: "Agreed", ParentID: &parentID}
+		if _, err := svc.CreatePostComment(ctxWithUser(userID), cmd); !errors.Is(err, dPost.ErrInvalidParentID) {
+			t.Errorf("CreatePostComment() error = %v, want %v", err, dPost.ErrInvalidParentID)
+		}
+	})
+}
+
+func TestService_CountPosts(t *testing.T) {
+	search := "soil"
+	var seen dPost.FilterQuery
+	svc := NewService(fakeTransactor{}, &fakeUserRepository{}, &fakePostRepository{
+		countPostsFunc: func(_ context.Context, _ database.Querier, f dPost.FilterQuery) (int, error) {
+			seen = f
+			return 7, nil
+		},
+	}, &fakeNoteRepository{})
+
+	got, err := svc.CountPosts(context.Background(), dPost.FilterQuery{Search: &search})
+	if err != nil {
+		t.Fatalf("CountPosts() error = %v, want nil", err)
+	}
+	if got != 7 || seen.Search == nil || *seen.Search != search {
+		t.Errorf("CountPosts() = %d with filter %+v, want 7 with search %q", got, seen, search)
+	}
+}
+
+/* ==================== Tests: reactions ==================== */
+
+func TestService_GetOnePost_ViewerReactions(t *testing.T) {
+	viewerID := uuid.New()
+	postID := uuid.New()
+	liked := uuid.New()
+	untouched := uuid.New()
+
+	postRepo := &fakePostRepository{
+		findPostByIDFunc: func(context.Context, database.Querier, uuid.UUID) (dPost.Post, error) {
+			return dPost.Post{ID: postID}, nil
+		},
+		listPostCommentsFunc: func(context.Context, database.Querier, uuid.UUID) ([]dPost.PostComment, error) {
+			return []dPost.PostComment{{ID: liked, PostID: postID}, {ID: untouched, PostID: postID}}, nil
+		},
+		listReactionsFunc: func(_ context.Context, _ database.Querier, userID, _ uuid.UUID) (map[uuid.UUID]dPost.ActionType, error) {
+			if userID != viewerID {
+				t.Errorf("reactions asked for user %v, want %v", userID, viewerID)
+			}
+			return map[uuid.UUID]dPost.ActionType{postID: dPost.ActionDislike, liked: dPost.ActionLike}, nil
+		},
+	}
+	svc := NewService(fakeTransactor{}, &fakeUserRepository{}, postRepo, &fakeNoteRepository{})
+
+	got, err := svc.GetOnePost(ctxWithUser(viewerID), postID)
+	if err != nil {
+		t.Fatalf("GetOnePost() error = %v, want nil", err)
+	}
+	if got.Post.ViewerReaction != dPost.ActionDislike {
+		t.Errorf("Post.ViewerReaction = %q, want %q", got.Post.ViewerReaction, dPost.ActionDislike)
+	}
+	if got.Comments[0].ViewerReaction != dPost.ActionLike || got.Comments[1].ViewerReaction != "" {
+		t.Errorf("comment reactions = %q and %q, want %q and none", got.Comments[0].ViewerReaction, got.Comments[1].ViewerReaction, dPost.ActionLike)
+	}
+}
+
+func TestService_RemovePostEngagement(t *testing.T) {
+	userID := uuid.New()
+	commentID := uuid.New()
+
+	var gotType dPost.PostType
+	var gotAsset, gotUser uuid.UUID
+	postRepo := &fakePostRepository{
+		removeReactionFunc: func(_ context.Context, _ database.Querier, assetType dPost.PostType, assetID, user uuid.UUID) error {
+			gotType, gotAsset, gotUser = assetType, assetID, user
+			return nil
+		},
+	}
+	svc := NewService(fakeTransactor{}, &fakeUserRepository{}, postRepo, &fakeNoteRepository{})
+
+	if err := svc.RemovePostEngagement(ctxWithUser(userID), dPost.TypeComment, commentID); err != nil {
+		t.Fatalf("RemovePostEngagement() error = %v, want nil", err)
+	}
+	if gotType != dPost.TypeComment || gotAsset != commentID || gotUser != userID {
+		t.Errorf("RemoveReaction got %v %v %v, want %v %v %v", gotType, gotAsset, gotUser, dPost.TypeComment, commentID, userID)
+	}
+
+	if err := svc.RemovePostEngagement(context.Background(), dPost.TypeComment, commentID); err == nil {
+		t.Error("RemovePostEngagement() without a signed-in user error = nil, want an error")
 	}
 }

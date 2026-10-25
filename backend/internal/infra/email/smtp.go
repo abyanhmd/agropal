@@ -34,7 +34,11 @@ func (s *SMTPSender) Send(_ context.Context, to, subject, body string) error {
 	addr := fmt.Sprintf("%s:%s", host, s.config.Smtp.Port)
 	from := s.config.Smtp.From
 
-	auth := smtp.PlainAuth("", s.config.Smtp.Username, s.config.Secret.Smtp, host)
+	// A relay that needs no login (a local mail catcher in development) is used without one
+	var auth smtp.Auth
+	if s.config.Smtp.Username != "" {
+		auth = smtp.PlainAuth("", s.config.Smtp.Username, s.config.Secret.Smtp, host)
+	}
 
 	msg := fmt.Sprintf(
 		"From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=\"UTF-8\"\r\n\r\n%s\r\n",

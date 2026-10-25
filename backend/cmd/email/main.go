@@ -37,6 +37,11 @@ func main() {
 	logger.Info(ctx, shared.System, "Connected to RabbitMQ")
 
 	var sender email.Sender = email.NewSMTPSender(logger, cfg)
+	if cfg.Smtp.Host == "" {
+		// Nowhere to deliver to: print the emails so a code can still be read in development
+		sender = email.NewLogSender(logger)
+		logger.Warn(ctx, shared.System, "SMTP_HOST is not set; emails will be printed to this log instead of sent")
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)

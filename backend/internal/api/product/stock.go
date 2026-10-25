@@ -4,6 +4,7 @@ import (
 	dProduct "agropal/internal/domain/product"
 	"agropal/internal/domain/shared"
 	"agropal/internal/request"
+	"agropal/internal/response"
 	"net/http"
 )
 
@@ -31,12 +32,13 @@ func (h *Handler) CreateProductStock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = h.productService.CreateProductStock(ctx, farmID, productID, req.ToCommand()); err != nil {
+	stockID, err := h.productService.CreateProductStock(ctx, farmID, productID, req.ToCommand())
+	if err != nil {
 		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.ioHandler.WriteSuccess(ctx, w, dProduct.SuccessStockAdded, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dProduct.SuccessStockAdded, response.StockCreatedResponse{StockID: stockID})
 }
 
 func (h *Handler) DeleteProductStock(w http.ResponseWriter, r *http.Request) {

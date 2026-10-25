@@ -3,13 +3,13 @@ package response
 import (
 	dAuth "agropal/internal/domain/auth"
 	dFarm "agropal/internal/domain/farm"
+	dLocation "agropal/internal/domain/location"
 	dNote "agropal/internal/domain/note"
 	dPost "agropal/internal/domain/post"
 	dProduct "agropal/internal/domain/product"
 	"agropal/internal/domain/shared"
 	dTransaction "agropal/internal/domain/transaction"
 	dUser "agropal/internal/domain/user"
-	dWeather "agropal/internal/domain/weather"
 )
 
 var ErrorRegistry = map[shared.ErrorKey]ResponseDetail{
@@ -115,6 +115,7 @@ var ErrorRegistry = map[shared.ErrorKey]ResponseDetail{
 	dPost.ErrInvalidAuthorID:   {HTTPCode: 400, Message: "The author ID is invalid."},    // "POST.INVALID_AUTHOR_ID"
 	dPost.ErrInvalidAssetType:  {HTTPCode: 400, Message: "The asset type is invalid."},   // "POST.INVALID_ASSET_TYPE"
 	dPost.ErrInvalidActionType: {HTTPCode: 400, Message: "The action type is invalid."},  // "POST.INVALID_ACTION_TYPE"
+	dPost.ErrInvalidSort:       {HTTPCode: 400, Message: "The sort is invalid."},          // "POST.INVALID_SORT"
 	dPost.ErrCreateFailed:      {HTTPCode: 500, Message: "Failed to create the post."},   // "POST.CREATE_FAILED"
 	dPost.ErrUpdateFailed:      {HTTPCode: 500, Message: "Failed to update the post."},   // "POST.UPDATE_FAILED"
 	dPost.ErrDeleteFailed:      {HTTPCode: 500, Message: "Failed to delete the post."},   // "POST.DELETE_FAILED"
@@ -129,6 +130,8 @@ var ErrorRegistry = map[shared.ErrorKey]ResponseDetail{
 	dProduct.ErrInvalidDescription:  {HTTPCode: 400, Message: "The product description is invalid."},    // "PRODUCT.INVALID_DESCRIPTION"
 	dProduct.ErrInvalidImage:        {HTTPCode: 400, Message: "The product image is invalid."},          // "PRODUCT.INVALID_IMAGE"
 	dProduct.ErrInvalidFarmID:       {HTTPCode: 400, Message: "The farm ID is invalid."},                // "PRODUCT.INVALID_FARM_ID"
+	dProduct.ErrInvalidUnit:         {HTTPCode: 400, Message: "The product unit is invalid."},           // "PRODUCT.INVALID_UNIT"
+	dProduct.ErrInvalidCurrency:     {HTTPCode: 400, Message: "The price currency is invalid."},         // "PRODUCT.INVALID_CURRENCY"
 	dProduct.ErrCreateFailed:        {HTTPCode: 500, Message: "Failed to create the product."},          // "PRODUCT.CREATE_FAILED"
 	dProduct.ErrUpdateFailed:        {HTTPCode: 500, Message: "Failed to update the product."},          // "PRODUCT.UPDATE_FAILED"
 	dProduct.ErrDeleteFailed:        {HTTPCode: 500, Message: "Failed to delete the product."},          // "PRODUCT.DELETE_FAILED"
@@ -155,15 +158,15 @@ var ErrorRegistry = map[shared.ErrorKey]ResponseDetail{
 	dTransaction.ErrUpdateFailed:       {HTTPCode: 500, Message: "Failed to update the transaction."},       // "TRANSACTION.UPDATE_FAILED"
 	dTransaction.ErrDeleteFailed:       {HTTPCode: 500, Message: "Failed to delete the transaction."},       // "TRANSACTION.DELETE_FAILED"
 
-	// WEATHER
-	dWeather.ErrNotFound:           {HTTPCode: 404, Message: "The weather data was not found."},               // "WEATHER.NOT_FOUND"
-	dWeather.ErrInvalidID:          {HTTPCode: 400, Message: "The weather ID is invalid."},                    // "WEATHER.INVALID_ID"
-	dWeather.ErrInvalidFarmID:      {HTTPCode: 400, Message: "The farm ID is invalid."},                       // "WEATHER.INVALID_FARM_ID"
-	dWeather.ErrInvalidLongitude:   {HTTPCode: 400, Message: "The longitude is invalid."},                     // "WEATHER.INVALID_LONGITUDE"
-	dWeather.ErrInvalidLatitude:    {HTTPCode: 400, Message: "The latitude is invalid."},                      // "WEATHER.INVALID_LATITUDE"
-	dWeather.ErrCreateFailed:       {HTTPCode: 500, Message: "Failed to create the weather data."},            // "WEATHER.CREATE_FAILED"
-	dWeather.ErrUpdateFailed:       {HTTPCode: 500, Message: "Failed to update the weather data."},            // "WEATHER.UPDATE_FAILED"
-	dWeather.ErrDeleteFailed:       {HTTPCode: 500, Message: "Failed to delete the weather data."},            // "WEATHER.DELETE_FAILED"
-	dWeather.ErrServiceUnavailable: {HTTPCode: 503, Message: "The weather service is currently unavailable."}, // "WEATHER.SERVICE_UNAVAILABLE"
-	dWeather.ErrDataFetchFailed:    {HTTPCode: 502, Message: "Failed to fetch weather data."},                 // "WEATHER.DATA_FETCH_FAILED"
+	// LOCATION
+	dLocation.ErrNotFound:           {HTTPCode: 404, Message: "The location was not found."},                    // "LOCATION.NOT_FOUND"
+	dLocation.ErrInvalidID:          {HTTPCode: 400, Message: "The location ID is invalid."},                    // "LOCATION.INVALID_ID"
+	dLocation.ErrInvalidFarmID:      {HTTPCode: 400, Message: "The farm ID is invalid."},                        // "LOCATION.INVALID_FARM_ID"
+	dLocation.ErrInvalidLongitude:   {HTTPCode: 400, Message: "The longitude is invalid."},                      // "LOCATION.INVALID_LONGITUDE"
+	dLocation.ErrInvalidLatitude:    {HTTPCode: 400, Message: "The latitude is invalid."},                       // "LOCATION.INVALID_LATITUDE"
+	dLocation.ErrCreateFailed:       {HTTPCode: 500, Message: "Failed to create the location."},                 // "LOCATION.CREATE_FAILED"
+	dLocation.ErrUpdateFailed:       {HTTPCode: 500, Message: "Failed to update the location."},                 // "LOCATION.UPDATE_FAILED"
+	dLocation.ErrDeleteFailed:       {HTTPCode: 500, Message: "Failed to delete the location."},                 // "LOCATION.DELETE_FAILED"
+	dLocation.ErrServiceUnavailable: {HTTPCode: 503, Message: "The location service is currently unavailable."}, // "LOCATION.SERVICE_UNAVAILABLE"
+	dLocation.ErrDataFetchFailed:    {HTTPCode: 502, Message: "Failed to fetch location data."},                 // "LOCATION.DATA_FETCH_FAILED"
 }

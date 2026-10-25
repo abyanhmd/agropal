@@ -81,10 +81,6 @@ func (f *fakeUserRepository) DeleteUser(context.Context, database.Querier, uuid.
 	panic("fakeUserRepository: DeleteUser not stubbed")
 }
 
-func (f *fakeUserRepository) ListUsersByAsset(context.Context, database.Querier, shared.AssetType, uuid.UUID) ([]dUser.User, error) {
-	panic("fakeUserRepository: ListUsersByAsset not stubbed")
-}
-
 // fakeFarmRepository implements dFarm.Repository, following the same
 // pattern as fakeUserRepository above.
 type fakeFarmRepository struct {
@@ -164,9 +160,12 @@ func TestService_Create(t *testing.T) {
 
 		svc := NewService(fakeTransactor{}, userRepo, farmRepo)
 
-		err := svc.Create(ctxWithUser(userID), FarmCommand{Name: "Green Acres"})
+		id, err := svc.Create(ctxWithUser(userID), FarmCommand{Name: "Green Acres"})
 		if err != nil {
 			t.Fatalf("Create() error = %v, want nil", err)
+		}
+		if id == uuid.Nil || id != created.ID {
+			t.Errorf("Create() id = %v, want the stored farm's id %v", id, created.ID)
 		}
 		if created.UserID != userID {
 			t.Errorf("created.UserID = %v, want %v", created.UserID, userID)
@@ -195,7 +194,7 @@ func TestService_Create(t *testing.T) {
 
 		svc := NewService(fakeTransactor{}, userRepo, farmRepo)
 
-		err := svc.Create(ctxWithUser(userID), FarmCommand{Name: "Green Acres"})
+		_, err := svc.Create(ctxWithUser(userID), FarmCommand{Name: "Green Acres"})
 		if !errors.Is(err, wantErr) {
 			t.Errorf("Create() error = %v, want %v", err, wantErr)
 		}
@@ -284,6 +283,9 @@ func TestService_Update(t *testing.T) {
 		err := svc.Update(ctxWithUser(ownerID), farmID, FarmCommand{Name: "New Name"})
 		if err != nil {
 			t.Fatalf("Update() error = %v, want nil", err)
+		}
+		if updated.ID != farmID {
+			t.Errorf("updated.ID = %v, want %v (the update must target the stored farm)", updated.ID, farmID)
 		}
 		if updated.Name != "New Name" {
 			t.Errorf("updated.Name = %q, want %q", updated.Name, "New Name")

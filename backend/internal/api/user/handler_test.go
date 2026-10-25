@@ -100,10 +100,6 @@ func (f *fakeUserRepository) DeleteUser(ctx context.Context, q database.Querier,
 	return f.deleteUserFunc(ctx, q, userID)
 }
 
-func (f *fakeUserRepository) ListUsersByAsset(context.Context, database.Querier, shared.AssetType, uuid.UUID) ([]dUser.User, error) {
-	panic("fakeUserRepository: ListUsersByAsset not stubbed")
-}
-
 // fakeAuthRepository implements dAuth.Repository; user.Service only calls
 // InvalidateSessions (on a password change), which defaults to a no-op here.
 type fakeAuthRepository struct{}
@@ -118,6 +114,10 @@ func (f *fakeAuthRepository) GetRefreshToken(context.Context, database.Querier, 
 
 func (f *fakeAuthRepository) DeleteRefreshToken(context.Context, database.Querier, string) error {
 	panic("fakeAuthRepository: DeleteRefreshToken not stubbed")
+}
+
+func (f *fakeAuthRepository) DeleteExpiredRefreshTokens(context.Context, database.Querier, time.Time) error {
+	panic("fakeAuthRepository: DeleteExpiredRefreshTokens not stubbed")
 }
 
 func (f *fakeAuthRepository) InvalidateSessions(context.Context, database.Querier, uuid.UUID) error {

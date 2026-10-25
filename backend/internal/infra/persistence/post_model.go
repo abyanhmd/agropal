@@ -17,6 +17,7 @@ type PostModel struct {
 	LikeCount    int        `db:"like_count"`
 	DislikeCount int        `db:"dislike_count"`
 	ViewCount    int        `db:"view_count"`
+	AuthorName   string     `db:"author_name"`
 	CreatedAt    time.Time  `db:"created_at"`
 	UpdatedAt    *time.Time `db:"updated_at"`
 }
@@ -31,6 +32,7 @@ type CommentModel struct {
 	LikeCount    int        `db:"like_count"`
 	DislikeCount int        `db:"dislike_count"`
 	ViewCount    int        `db:"view_count"`
+	AuthorName   string     `db:"author_name"`
 	CreatedAt    time.Time  `db:"created_at"`
 	UpdatedAt    *time.Time `db:"updated_at"`
 }
@@ -95,6 +97,7 @@ func (m PostModel) ToDomain() dPost.Post {
 		Content:      m.Content,
 		Slug:         m.Slug,
 		CommentCount: m.CommentCount,
+		AuthorName:   m.AuthorName,
 		LikeCount:    m.LikeCount,
 		DislikeCount: m.DislikeCount,
 		ViewCount:    m.ViewCount,
@@ -114,6 +117,7 @@ func (m CommentModel) ToDomain() dPost.PostComment {
 		LikeCount:    m.LikeCount,
 		DislikeCount: m.DislikeCount,
 		ViewCount:    m.ViewCount,
+		AuthorName:   m.AuthorName,
 		CreatedAt:    m.CreatedAt,
 		UpdatedAt:    m.UpdatedAt,
 	}

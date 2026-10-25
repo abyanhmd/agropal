@@ -9,7 +9,7 @@ const (
 	AssetFarm        AssetType = "Farm"
 	AssetProduct     AssetType = "Product"
 	AssetTransaction AssetType = "Transaction"
-	AssetWeather     AssetType = "Weather"
+	AssetLocation    AssetType = "Location"
 	AssetPost        AssetType = "Post"
 	AssetComment     AssetType = "Comment"
 )

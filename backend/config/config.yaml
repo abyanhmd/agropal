@@ -13,7 +13,7 @@ cors:
   # "*" reflects any origin — dev only, since it still enables credentials.
   # Empty blocks browser cross-origin calls; native/mobile and
   # server-to-server clients send no Origin and are unaffected.
-  allowed_origins: []
+  allowed_origins: ["http://localhost:3000"]
 path:
   migration: "internal/migration"
   log: "logs"

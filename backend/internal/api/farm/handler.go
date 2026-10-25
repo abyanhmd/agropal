@@ -37,12 +37,13 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.farmService.Create(ctx, req.ToCommand()); err != nil {
+	farmID, err := h.farmService.Create(ctx, req.ToCommand())
+	if err != nil {
 		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.ioHandler.WriteSuccess(ctx, w, dFarm.SuccessCreated, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dFarm.SuccessCreated, response.FarmCreatedResponse{FarmID: farmID})
 }
 
 func (h *Handler) GetOne(w http.ResponseWriter, r *http.Request) {

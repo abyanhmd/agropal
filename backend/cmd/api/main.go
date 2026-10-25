@@ -4,12 +4,12 @@ import (
 	"agropal/config"
 	interfaceAuth "agropal/internal/api/auth"
 	apiFarm "agropal/internal/api/farm"
+	apiLocation "agropal/internal/api/location"
 	"agropal/internal/api/middleware"
 	apiPost "agropal/internal/api/post"
 	apiProduct "agropal/internal/api/product"
 	apiTransaction "agropal/internal/api/transaction"
 	apiUser "agropal/internal/api/user"
-	apiWeather "agropal/internal/api/weather"
 	"agropal/internal/app"
 	"agropal/internal/domain/shared"
 	"agropal/internal/infra/crypto"
@@ -31,6 +31,9 @@ import (
 func main() {
 	/* Config */
 	cfg := config.LoadConfig("./config/config.yaml")
+	if err := cfg.ValidateSecrets(); err != nil {
+		panic(err)
+	}
 
 	/* Logger */
 	logger := pkg.NewLogger(*cfg)
@@ -73,6 +76,12 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	// Liveness for the container healthcheck and reverse proxy; deliberately outside the rate-limited stacks
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+
 	// RequestID runs outermost so the correlation id reaches every layer
 	// below (Recover included); Recover then catches panics in Logger/
 	// RateLimiter; Logger runs on every request; RequireAuth only guards
@@ -93,7 +102,7 @@ func main() {
 	mux.Handle("POST /api/v1/auth/reset-password/confirm", publicStack(http.HandlerFunc(authHandler.ConfirmPasswordReset)))
 
 	apiFarm.NewRouter(mux, protectedStack, mw, apiFarm.NewHandler(ioHandler, container.Farm.Service))
-	apiWeather.NewRouter(mux, protectedStack, mw, apiWeather.NewHandler(ioHandler, container.Weather.Service))
+	apiLocation.NewRouter(mux, protectedStack, mw, apiLocation.NewHandler(ioHandler, container.Location.Service))
 	apiProduct.NewRouter(mux, protectedStack, mw, apiProduct.NewHandler(ioHandler, container.Product.Service))
 	apiTransaction.NewRouter(mux, protectedStack, mw, apiTransaction.NewHandler(ioHandler, container.Transaction.Service))
 	apiUser.NewRouter(mux, protectedStack, mw, apiUser.NewHandler(ioHandler, container.User.Service))
@@ -102,6 +111,11 @@ func main() {
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	srv := &http.Server{
 		Addr: addr,
+		// Without these a client can hold connections open indefinitely by sending headers or a body very slowly
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 		// CORS wraps the whole mux so it also covers the preflight OPTIONS
 		// for the method-pattern auth routes, which ServeMux would otherwise
 		// answer with a bare 405.
@@ -112,6 +126,24 @@ func main() {
 		logger.Info(ctx, shared.System, fmt.Sprintf("Listening on %s", addr))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error(ctx, shared.System, fmt.Sprintf("Server error: %v", err))
+		}
+	}()
+
+	// Tokens left to expire on their own are never removed by rotation or logout, so sweep them out
+	sweepCtx, stopSweep := context.WithCancel(ctx)
+	defer stopSweep()
+	go func() {
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for {
+			if err := container.Auth.Service.PruneExpiredSessions(sweepCtx); err != nil && sweepCtx.Err() == nil {
+				logger.Error(ctx, shared.System, fmt.Sprintf("Failed to prune expired sessions: %v", err))
+			}
+			select {
+			case <-sweepCtx.Done():
+				return
+			case <-ticker.C:
+			}
 		}
 	}()
 

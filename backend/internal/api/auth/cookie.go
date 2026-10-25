@@ -32,3 +32,13 @@ func removeAuthCookie(w http.ResponseWriter) {
 		MaxAge:   -1,
 	})
 }
+
+// accessTokenBody is what a sign-in response carries. The refresh token travels only in the httpOnly
+// cookie; putting it in the body too would hand it to any script on the page.
+type accessTokenBody struct {
+	AccessTokenStr string
+}
+
+func bodyFor(tokenPair dAuth.TokenPair) accessTokenBody {
+	return accessTokenBody{AccessTokenStr: tokenPair.AccessTokenStr}
+}

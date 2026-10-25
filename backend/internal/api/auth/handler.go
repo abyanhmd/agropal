@@ -35,16 +35,17 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 	cmd, err := ToRegisterCommand(req)
 	if err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	if err := h.authService.Register(ctx, cmd); err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+	data, err := h.authService.Register(ctx, cmd)
+	if err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessRegister, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessRegister, data)
 }
 
 func (h *Handler) VerifyRegister(w http.ResponseWriter, r *http.Request) {
@@ -58,18 +59,18 @@ func (h *Handler) VerifyRegister(w http.ResponseWriter, r *http.Request) {
 
 	email, code, err := ToVerification(req)
 	if err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
 	tokenPair, err := h.authService.VerifyRegistration(ctx, email, code)
 	if err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 	setAuthCookie(w, tokenPair)
 
-	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessEmailVerified, tokenPair)
+	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessEmailVerified, bodyFor(tokenPair))
 }
 
 func (h *Handler) ResendVerificationCode(w http.ResponseWriter, r *http.Request) {
@@ -83,16 +84,17 @@ func (h *Handler) ResendVerificationCode(w http.ResponseWriter, r *http.Request)
 
 	email, purpose, err := ToResendVerification(req, r.PathValue("purpose"))
 	if err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	if err := h.authService.SendVerificationCode(ctx, purpose, email); err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+	payload, err := h.authService.SendVerificationCode(ctx, purpose, email)
+	if err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessVerificationSent, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessVerificationSent, payload)
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
@@ -106,16 +108,17 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	cmd, err := ToLoginCommand(req)
 	if err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	if err := h.authService.Login(ctx, cmd); err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+	data, err := h.authService.Login(ctx, cmd)
+	if err != nil {
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessVerificationSent, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessVerificationSent, data)
 }
 
 func (h *Handler) VerifyLogin(w http.ResponseWriter, r *http.Request) {
@@ -129,18 +132,18 @@ func (h *Handler) VerifyLogin(w http.ResponseWriter, r *http.Request) {
 
 	email, code, err := ToVerification(req)
 	if err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
 	tokenPair, err := h.authService.VerifyLogin(ctx, email, code)
 	if err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 	setAuthCookie(w, tokenPair)
 
-	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessLogin, tokenPair)
+	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessLogin, bodyFor(tokenPair))
 }
 
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
@@ -154,12 +157,12 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	tokenPair, err := h.authService.Refresh(ctx, cookie.Value)
 	if err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 	setAuthCookie(w, tokenPair)
 
-	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessRefresh, tokenPair)
+	h.ioHandler.WriteSuccess(ctx, w, dAuth.SuccessRefresh, bodyFor(tokenPair))
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
@@ -172,7 +175,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.authService.Invalidate(ctx, cookie.Value); err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
@@ -192,12 +195,12 @@ func (h *Handler) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
 
 	email, err := ToPasswordResetEmail(req)
 	if err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
 	if err := h.authService.RequestPasswordReset(ctx, email); err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
@@ -215,12 +218,12 @@ func (h *Handler) ConfirmPasswordReset(w http.ResponseWriter, r *http.Request) {
 
 	email, code, newPassword, err := ToPasswordResetConfirmation(req)
 	if err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
 	if err := h.authService.ConfirmPasswordReset(ctx, email, code, newPassword); err != nil {
-		h.ioHandler.WriteError(ctx, w, shared.ErrorKey(err.Error()), nil)
+		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 

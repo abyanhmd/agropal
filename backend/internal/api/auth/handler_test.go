@@ -107,15 +107,15 @@ func (f *fakeUserRepository) DeleteUser(context.Context, database.Querier, uuid.
 	panic("fakeUserRepository: DeleteUser not stubbed")
 }
 
-func (f *fakeUserRepository) ListUsersByAsset(context.Context, database.Querier, shared.AssetType, uuid.UUID) ([]dUser.User, error) {
-	panic("fakeUserRepository: ListUsersByAsset not stubbed")
-}
-
 // fakeAuthRepository implements dAuth.Repository.
 type fakeAuthRepository struct {
 	createRefreshTokenFunc func(ctx context.Context, q database.Querier, rt dAuth.RefreshToken) error
 	getRefreshTokenFunc    func(ctx context.Context, q database.Querier, refreshTokenID string) (dAuth.RefreshToken, error)
 	deleteRefreshTokenFunc func(ctx context.Context, q database.Querier, refreshTokenID string) error
+}
+
+func (f *fakeAuthRepository) DeleteExpiredRefreshTokens(context.Context, database.Querier, time.Time) error {
+	panic("fakeAuthRepository: DeleteExpiredRefreshTokens not stubbed")
 }
 
 func (f *fakeAuthRepository) InvalidateSessions(context.Context, database.Querier, uuid.UUID) error {
@@ -466,12 +466,55 @@ func TestHandler_Login(t *testing.T) {
 
 		h.Login(rec, req)
 
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusUnauthorized, rec.Body.String())
+		}
+		envelope := decodeEnvelope(t, rec)
+		if envelope.Info.Key != dAuth.ErrInvalidCredentials.Error() {
+			t.Errorf("Info.Key = %q, want %q", envelope.Info.Key, dAuth.ErrInvalidCredentials.Error())
+		}
+	})
+
+	t.Run("Unknown Account Looks Like A Wrong Password", func(t *testing.T) {
+		userRepo := &fakeUserRepository{
+			findUserByEmailFunc: func(context.Context, database.Querier, string) (dUser.User, error) {
+				return dUser.User{}, dUser.ErrNotFound
+			},
+		}
+		h := newTestHandler(t, userRepo, &fakeAuthRepository{}, nil, &fakeTokenProvider{})
+
+		req := jsonRequest(http.MethodPost, "/auth/login", `{"email":"nobody@example.com","password":"wrong-password"}`)
+		rec := httptest.NewRecorder()
+
+		h.Login(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusUnauthorized, rec.Body.String())
+		}
+		if key := decodeEnvelope(t, rec).Info.Key; key != dAuth.ErrInvalidCredentials.Error() {
+			t.Errorf("Info.Key = %q, want %q", key, dAuth.ErrInvalidCredentials.Error())
+		}
+	})
+
+	t.Run("Email And Username Together Are Rejected", func(t *testing.T) {
+		userRepo := &fakeUserRepository{
+			findUserByEmailFunc: func(context.Context, database.Querier, string) (dUser.User, error) {
+				t.Fatal("service should not be called when the request names the account twice")
+				return dUser.User{}, nil
+			},
+		}
+		h := newTestHandler(t, userRepo, &fakeAuthRepository{}, nil, &fakeTokenProvider{})
+
+		req := jsonRequest(http.MethodPost, "/auth/login", `{"email":"`+email+`","username":"someone-else","password":"Str0ng!Pass1"}`)
+		rec := httptest.NewRecorder()
+
+		h.Login(rec, req)
+
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusBadRequest, rec.Body.String())
 		}
-		envelope := decodeEnvelope(t, rec)
-		if envelope.Info.Key != dAuth.ErrInvalidPassword.Error() {
-			t.Errorf("Info.Key = %q, want %q", envelope.Info.Key, dAuth.ErrInvalidPassword.Error())
+		if key := decodeEnvelope(t, rec).Info.Key; key != shared.ErrInvalidRequest.Error() {
+			t.Errorf("Info.Key = %q, want %q", key, shared.ErrInvalidRequest.Error())
 		}
 	})
 
@@ -608,7 +651,10 @@ func TestHandler_Refresh(t *testing.T) {
 				return shared.ClaimInfo{}, dAuth.ErrTokenInvalid
 			},
 		}
-		h := newTestHandler(t, &fakeUserRepository{}, &fakeAuthRepository{}, nil, jwt)
+		authRepo := &fakeAuthRepository{getRefreshTokenFunc: func(context.Context, database.Querier, string) (dAuth.RefreshToken, error) {
+			return dAuth.RefreshToken{ID: "some-refresh-id", Token: "tampered"}, nil
+		}}
+		h := newTestHandler(t, &fakeUserRepository{}, authRepo, nil, jwt)
 
 		req := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
 		req.AddCookie(&http.Cookie{Name: "rid", Value: "some-refresh-id"})

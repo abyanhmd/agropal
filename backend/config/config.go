@@ -56,6 +56,11 @@ type Config struct {
 		Username string `mapstructure:"username"`
 		From     string `mapstructure:"from"`
 	} `mapstructure:"smtp"`
+	Auth struct {
+		// ExposeCodes returns one-time codes in API responses. Development only: it lets anyone verify
+		// an email address they do not own.
+		ExposeCodes bool `mapstructure:"expose_codes"`
+	} `mapstructure:"auth"`
 	Secret struct {
 		Jwt      string `mapstructure:"jwt"`
 		GcmToken string `mapstructure:"gcm_token"`
@@ -94,6 +99,8 @@ func LoadConfig(path string) *Config {
 		"smtp.port":     "SMTP_PORT",
 		"smtp.username": "SMTP_USERNAME",
 		"smtp.from":     "SMTP_FROM",
+
+		"auth.expose_codes": "EXPOSE_CODES",
 
 		"secret.jwt":       "SECRET_JWT",
 		"secret.gcm_token": "SECRET_GCM_TOKEN",

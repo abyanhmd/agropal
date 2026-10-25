@@ -83,10 +83,6 @@ func (f *fakeUserRepository) DeleteUser(context.Context, database.Querier, uuid.
 	panic("fakeUserRepository: DeleteUser not stubbed")
 }
 
-func (f *fakeUserRepository) ListUsersByAsset(context.Context, database.Querier, shared.AssetType, uuid.UUID) ([]dUser.User, error) {
-	panic("fakeUserRepository: ListUsersByAsset not stubbed")
-}
-
 // fakeFarmRepository implements dFarm.Repository. Only FindFarmByID is
 // exercised by product.Service.
 type fakeFarmRepository struct {
@@ -265,9 +261,13 @@ func TestService_CreateProduct(t *testing.T) {
 		}
 		svc := NewService(fakeTransactor{}, userRepo, farmRepo, productRepo, &fakeNoteRepository{})
 
-		cmd := ProductCommand{Name: shared.Ptr("Tomato"), Description: shared.Ptr("Fresh"), Image: shared.Ptr("t.png")}
-		if err := svc.CreateProduct(ctxWithUser(ownerID), farmID, cmd); err != nil {
+		cmd := ProductCommand{Name: shared.Ptr("Tomato"), Description: shared.Ptr("Fresh"), Image: shared.Ptr("t.png"), Unit: shared.Ptr("kg")}
+		id, err := svc.CreateProduct(ctxWithUser(ownerID), farmID, cmd)
+		if err != nil {
 			t.Fatalf("CreateProduct() error = %v, want nil", err)
+		}
+		if id == uuid.Nil || id != created.ID {
+			t.Errorf("CreateProduct() id = %v, want the stored product's id %v", id, created.ID)
 		}
 		if created.FarmID != farmID || created.Name != "Tomato" {
 			t.Errorf("created = %+v, want FarmID=%v Name=Tomato", created, farmID)
@@ -294,12 +294,43 @@ func TestService_CreateProduct(t *testing.T) {
 		}
 		svc := NewService(fakeTransactor{}, userRepo, farmRepo, productRepo, &fakeNoteRepository{})
 
-		cmd := ProductCommand{Name: shared.Ptr("Tomato"), Description: shared.Ptr("Fresh"), Image: shared.Ptr("t.png")}
-		err := svc.CreateProduct(ctxWithUser(otherUserID), farmID, cmd)
+		cmd := ProductCommand{Name: shared.Ptr("Tomato"), Description: shared.Ptr("Fresh"), Image: shared.Ptr("t.png"), Unit: shared.Ptr("kg")}
+		_, err := svc.CreateProduct(ctxWithUser(otherUserID), farmID, cmd)
 		if !errors.Is(err, shared.ErrForbidden) {
 			t.Errorf("CreateProduct() error = %v, want %v", err, shared.ErrForbidden)
 		}
 	})
+}
+
+func TestService_CreateProduct_RequiresUnit(t *testing.T) {
+	ownerID := uuid.New()
+	farmID := uuid.New()
+	userRepo := &fakeUserRepository{
+		findUserByIDFunc: func(context.Context, database.Querier, uuid.UUID) (dUser.User, error) {
+			return dUser.User{ID: ownerID}, nil
+		},
+	}
+	farmRepo := &fakeFarmRepository{
+		findFarmByIDFunc: func(context.Context, database.Querier, uuid.UUID) (dFarm.Farm, error) {
+			return dFarm.Farm{ID: farmID, UserID: ownerID}, nil
+		},
+	}
+	productRepo := &fakeProductRepository{
+		createProductFunc: func(context.Context, database.Querier, dProduct.Product) error {
+			t.Error("CreateProduct reached the repository without a unit")
+			return nil
+		},
+	}
+	svc := NewService(fakeTransactor{}, userRepo, farmRepo, productRepo, &fakeNoteRepository{})
+
+	for name, unit := range map[string]*string{"missing": nil, "blank": shared.Ptr("  ")} {
+		t.Run(name, func(t *testing.T) {
+			cmd := ProductCommand{Name: shared.Ptr("Tomato"), Description: shared.Ptr("Fresh"), Image: shared.Ptr("t.png"), Unit: unit}
+			if _, err := svc.CreateProduct(ctxWithUser(ownerID), farmID, cmd); !errors.Is(err, dProduct.ErrInvalidUnit) {
+				t.Errorf("CreateProduct() error = %v, want %v", err, dProduct.ErrInvalidUnit)
+			}
+		})
+	}
 }
 
 func TestService_GetOneProduct(t *testing.T) {
@@ -424,6 +455,9 @@ func TestService_DeleteProduct(t *testing.T) {
 			},
 		}
 		productRepo := &fakeProductRepository{
+			findProductByIDFunc: func(context.Context, database.Querier, uuid.UUID) (dProduct.Product, error) {
+				return dProduct.Product{ID: productID, FarmID: farmID}, nil
+			},
 			deleteProductFunc: func(_ context.Context, _ database.Querier, id uuid.UUID) error {
 				deletedID = id
 				return nil
@@ -436,6 +470,35 @@ func TestService_DeleteProduct(t *testing.T) {
 		}
 		if deletedID != productID {
 			t.Errorf("deleted product ID = %v, want %v", deletedID, productID)
+		}
+	})
+
+	t.Run("forbids a product from another farm", func(t *testing.T) {
+		// The requester owns farmID, but the product belongs to someone else's farm
+		userRepo := &fakeUserRepository{
+			findUserByIDFunc: func(context.Context, database.Querier, uuid.UUID) (dUser.User, error) {
+				return dUser.User{ID: ownerID}, nil
+			},
+		}
+		farmRepo := &fakeFarmRepository{
+			findFarmByIDFunc: func(context.Context, database.Querier, uuid.UUID) (dFarm.Farm, error) {
+				return farm, nil
+			},
+		}
+		productRepo := &fakeProductRepository{
+			findProductByIDFunc: func(context.Context, database.Querier, uuid.UUID) (dProduct.Product, error) {
+				return dProduct.Product{ID: productID, FarmID: uuid.New()}, nil
+			},
+			deleteProductFunc: func(context.Context, database.Querier, uuid.UUID) error {
+				t.Fatal("DeleteProduct should not be called for a product outside the farm")
+				return nil
+			},
+		}
+		svc := NewService(fakeTransactor{}, userRepo, farmRepo, productRepo, &fakeNoteRepository{})
+
+		err := svc.DeleteProduct(ctxWithUser(ownerID), farmID, productID)
+		if !errors.Is(err, shared.ErrForbidden) {
+			t.Errorf("DeleteProduct() error = %v, want %v", err, shared.ErrForbidden)
 		}
 	})
 

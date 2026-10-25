@@ -8,23 +8,32 @@ import (
 	dUser "agropal/internal/domain/user"
 	"agropal/internal/infra/database"
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-func (s *Service) CreateProduct(ctx context.Context, farmID uuid.UUID, cmd ProductCommand) error {
+func (s *Service) CreateProduct(ctx context.Context, farmID uuid.UUID, cmd ProductCommand) (uuid.UUID, error) {
 	if err := s.verifyFarm(ctx, farmID); err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
 	productID, err := uuid.NewV7()
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	product := cmd.ToDomain(farmID, productID)
 
-	return s.productRepo.CreateProduct(ctx, s.transactor.DB(), product)
+	if strings.TrimSpace(product.Unit) == "" {
+		return uuid.Nil, dProduct.ErrInvalidUnit
+	}
+
+	if err = s.productRepo.CreateProduct(ctx, s.transactor.DB(), product); err != nil {
+		return uuid.Nil, err
+	}
+
+	return productID, nil
 }
 
 func (s *Service) UpdateProduct(ctx context.Context, farmID, productID uuid.UUID, cmd ProductCommand) error {
@@ -95,6 +104,22 @@ func (s *Service) UpdateProduct(ctx context.Context, farmID, productID uuid.UUID
 
 			product.Image = *cmd.Image
 		}
+		if cmd.Unit != nil {
+			if strings.TrimSpace(*cmd.Unit) == "" {
+				return dProduct.ErrInvalidUnit
+			}
+			noteID, err := uuid.NewV7()
+			if err != nil {
+				return err
+			}
+			updateNote.ID = noteID
+			updateNote.UpdateField = shared.Ptr("unit")
+			updateNote.OldValue = shared.Ptr(product.Unit)
+			updateNote.NewValue = cmd.Unit
+			updateNotes = append(updateNotes, updateNote)
+
+			product.Unit = *cmd.Unit
+		}
 
 		if err = s.productRepo.UpdateProduct(ctx, q, product); err != nil {
 			return err
@@ -142,7 +167,19 @@ func (s *Service) DeleteProduct(ctx context.Context, farmID, productID uuid.UUID
 		return err
 	}
 
-	return s.productRepo.DeleteProduct(ctx, s.transactor.DB(), productID)
+	// verifyFarm only proves the requester owns farmID; the product must also belong to it,
+	// or any owner could delete another farm's product by pairing their farm ID with its ID
+	return s.transactor.WithTx(ctx, func(q database.Querier) error {
+		product, err := s.productRepo.FindProductByID(ctx, q, productID)
+		if err != nil {
+			return err
+		}
+		if product.FarmID != farmID {
+			return shared.ErrForbidden
+		}
+
+		return s.productRepo.DeleteProduct(ctx, q, productID)
+	})
 }
 
 func (s *Service) verifyFarm(ctx context.Context, farmID uuid.UUID) error {

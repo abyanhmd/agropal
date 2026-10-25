@@ -17,7 +17,7 @@ func TestProductRepository_CreateAndFindByID(t *testing.T) {
 	repo := NewProductRepository(testLogger)
 	farmID := insertTestFarm(t)
 
-	product := dProduct.Product{ID: uuid.New(), FarmID: farmID, Name: "Tomato", Description: "Fresh", Image: "t.png"}
+	product := dProduct.Product{ID: uuid.New(), FarmID: farmID, Name: "Tomato", Description: "Fresh", Image: "t.png", Unit: "kg"}
 	if err := repo.CreateProduct(ctx, testDB, product); err != nil {
 		t.Fatalf("CreateProduct() error = %v, want nil", err)
 	}
@@ -98,11 +98,11 @@ func TestProductRepository_FindProductDetailByID(t *testing.T) {
 	}
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	stock := dProduct.ProductStock{ID: uuid.New(), ProductID: product.ID, DateAdded: now, Type: dProduct.MovementIn, Stock: 10}
+	stock := dProduct.ProductStock{ID: uuid.New(), ProductID: product.ID, DateAdded: now, Type: dProduct.MovementIncome, Stock: 10}
 	if err := repo.AddProductStock(ctx, testDB, stock); err != nil {
 		t.Fatalf("AddProductStock() error = %v, want nil", err)
 	}
-	price := dProduct.ProductPrice{ID: uuid.New(), ProductID: product.ID, DateAdded: now, Price: 5.5}
+	price := dProduct.ProductPrice{ID: uuid.New(), ProductID: product.ID, DateAdded: now, Price: 5.5, Currency: "EUR"}
 	if err := repo.AddProductPrice(ctx, testDB, price); err != nil {
 		t.Fatalf("AddProductPrice() error = %v, want nil", err)
 	}
@@ -114,11 +114,11 @@ func TestProductRepository_FindProductDetailByID(t *testing.T) {
 	if got.Product != product {
 		t.Errorf("Product = %+v, want %+v", got.Product, product)
 	}
-	if len(got.Stocks) != 1 || got.Stocks[0].Stock != 10 || got.Stocks[0].Type != dProduct.MovementIn {
-		t.Errorf("Stocks = %+v, want a single MovementIn entry of 10", got.Stocks)
+	if len(got.Stocks) != 1 || got.Stocks[0].Stock != 10 || got.Stocks[0].Type != dProduct.MovementIncome {
+		t.Errorf("Stocks = %+v, want a single income entry of 10", got.Stocks)
 	}
-	if len(got.Prices) != 1 || got.Prices[0].Price != 5.5 {
-		t.Errorf("Prices = %+v, want a single entry of 5.5", got.Prices)
+	if len(got.Prices) != 1 || got.Prices[0].Price != 5.5 || got.Prices[0].Currency != "EUR" {
+		t.Errorf("Prices = %+v, want a single entry of 5.5 EUR", got.Prices)
 	}
 }
 
@@ -163,7 +163,7 @@ func TestProductRepository_ListProductsByFarmID(t *testing.T) {
 		}
 	}
 
-	stockA := dProduct.ProductStock{ID: uuid.New(), ProductID: productA.ID, DateAdded: now, Type: dProduct.MovementIn, Stock: 3}
+	stockA := dProduct.ProductStock{ID: uuid.New(), ProductID: productA.ID, DateAdded: now, Type: dProduct.MovementIncome, Stock: 3}
 	if err := repo.AddProductStock(ctx, testDB, stockA); err != nil {
 		t.Fatalf("AddProductStock() error = %v, want nil", err)
 	}
@@ -206,7 +206,7 @@ func TestProductRepository_DeleteProductStockAndPrice(t *testing.T) {
 		t.Fatalf("CreateProduct() error = %v, want nil", err)
 	}
 
-	stock := dProduct.ProductStock{ID: uuid.New(), ProductID: product.ID, DateAdded: now, Type: dProduct.MovementOut, Stock: 2}
+	stock := dProduct.ProductStock{ID: uuid.New(), ProductID: product.ID, DateAdded: now, Type: dProduct.MovementExpense, Stock: 2}
 	if err := repo.AddProductStock(ctx, testDB, stock); err != nil {
 		t.Fatalf("AddProductStock() error = %v, want nil", err)
 	}

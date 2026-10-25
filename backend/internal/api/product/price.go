@@ -4,6 +4,7 @@ import (
 	dProduct "agropal/internal/domain/product"
 	"agropal/internal/domain/shared"
 	"agropal/internal/request"
+	"agropal/internal/response"
 	"net/http"
 )
 
@@ -31,12 +32,13 @@ func (h *Handler) CreateProductPrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = h.productService.CreateProductPrice(ctx, farmID, productID, req.ToCommand()); err != nil {
+	priceID, err := h.productService.CreateProductPrice(ctx, farmID, productID, req.ToCommand())
+	if err != nil {
 		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.ioHandler.WriteSuccess(ctx, w, dProduct.SuccessPriceAdded, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dProduct.SuccessPriceAdded, response.PriceCreatedResponse{PriceID: priceID})
 }
 
 func (h *Handler) DeleteProductPrice(w http.ResponseWriter, r *http.Request) {

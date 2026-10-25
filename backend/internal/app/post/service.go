@@ -8,6 +8,7 @@ import (
 	dUser "agropal/internal/domain/user"
 	"agropal/internal/infra/database"
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,25 +35,29 @@ func NewService(
 	}
 }
 
-func (s *Service) CreatePost(ctx context.Context, cmd PostCommand) error {
+// CreatePost returns the new post, whose slug is its address
+func (s *Service) CreatePost(ctx context.Context, cmd PostCommand) (dPost.Post, error) {
 	user, err := s.verifyAccess(ctx, cmd.UserID)
 	if err != nil {
-		return err
+		return dPost.Post{}, err
 	}
 
 	postID, err := uuid.NewV7()
 	if err != nil {
-		return err
+		return dPost.Post{}, err
 	}
+	nowUTC := time.Now().UTC()
 	post := cmd.ToDomain(postID, user.ID)
+	post.Slug = slugFor(post.Title, postID)
+	post.CreatedAt = nowUTC
 
 	noteID, err := uuid.NewV7()
 	if err != nil {
-		return err
+		return dPost.Post{}, err
 	}
 	createNote := dNote.Note{
 		ID:         noteID,
-		CreatedAt:  time.Now().UTC(),
+		CreatedAt:  nowUTC,
 		Type:       dNote.TypeCreate,
 		AssetType:  shared.AssetPost,
 		AssetID:    postID,
@@ -60,7 +65,7 @@ func (s *Service) CreatePost(ctx context.Context, cmd PostCommand) error {
 		AuthorName: user.Account.Name,
 	}
 
-	return s.transactor.WithTx(ctx, func(q database.Querier) error {
+	err = s.transactor.WithTx(ctx, func(q database.Querier) error {
 		if errPost := s.postRepo.CreatePost(ctx, q, post); errPost != nil {
 			return errPost
 		}
@@ -69,18 +74,35 @@ func (s *Service) CreatePost(ctx context.Context, cmd PostCommand) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return dPost.Post{}, err
+	}
+
+	return post, nil
 }
 
-func (s *Service) GetOnePost(ctx context.Context, postID uuid.UUID, filter dPost.FilterQuery) (dPost.PostDetail, error) {
+func (s *Service) GetOnePost(ctx context.Context, postID uuid.UUID) (dPost.PostDetail, error) {
 	var postDetail dPost.PostDetail
 	err := s.transactor.WithTx(ctx, func(q database.Querier) error {
 		post, err := s.postRepo.FindPostByID(ctx, q, postID)
 		if err != nil {
 			return err
 		}
-		comments, err := s.postRepo.ListCommentReplies(ctx, q, postID, filter)
+		comments, err := s.postRepo.ListPostComments(ctx, q, postID)
 		if err != nil {
 			return err
+		}
+
+		// Reactions are the requester's own; without a signed-in user there are none to show
+		if userID, errUser := shared.ExtractUserID(ctx); errUser == nil {
+			reactions, errReactions := s.postRepo.ListReactions(ctx, q, userID, postID)
+			if errReactions != nil {
+				return errReactions
+			}
+			post.ViewerReaction = reactions[post.ID]
+			for i := range comments {
+				comments[i].ViewerReaction = reactions[comments[i].ID]
+			}
 		}
 
 		postDetail.Post = post
@@ -99,20 +121,48 @@ func (s *Service) GetManyPosts(ctx context.Context, filter dPost.FilterQuery) ([
 	return s.postRepo.ListPosts(ctx, s.transactor.DB(), filter)
 }
 
-func (s *Service) CreatePostComment(ctx context.Context, cmd PostCommentCommand) error {
+// CountPosts counts the posts a filter matches, ignoring its pagination, so a client can page through them.
+func (s *Service) CountPosts(ctx context.Context, filter dPost.FilterQuery) (int, error) {
+	return s.postRepo.CountPosts(ctx, s.transactor.DB(), filter)
+}
+
+func (s *Service) GetPostAuthors(ctx context.Context) ([]dPost.PostAuthor, error) {
+	return s.postRepo.ListPostAuthors(ctx, s.transactor.DB())
+}
+
+func (s *Service) CreatePostComment(ctx context.Context, cmd PostCommentCommand) (uuid.UUID, error) {
 	userID, errParse := shared.ExtractUserID(ctx)
 	if errParse != nil {
-		return errParse
+		return uuid.Nil, errParse
+	}
+
+	// A reply must answer a comment on the same post
+	if cmd.ParentID != nil {
+		parent, err := s.postRepo.FindCommentByID(ctx, s.transactor.DB(), *cmd.ParentID)
+		if err != nil {
+			if errors.Is(err, dPost.ErrCommentNotFound) {
+				return uuid.Nil, dPost.ErrInvalidParentID
+			}
+			return uuid.Nil, err
+		}
+		if parent.PostID != cmd.PostID {
+			return uuid.Nil, dPost.ErrInvalidParentID
+		}
 	}
 	comment := cmd.ToDomain(userID)
 
 	commentID, errGen := uuid.NewV7()
 	if errGen != nil {
-		return errGen
+		return uuid.Nil, errGen
 	}
 	comment.ID = commentID
+	comment.CreatedAt = time.Now().UTC()
 
-	return s.postRepo.AddComment(ctx, s.transactor.DB(), comment)
+	if err := s.postRepo.AddComment(ctx, s.transactor.DB(), comment); err != nil {
+		return uuid.Nil, err
+	}
+
+	return commentID, nil
 }
 
 func (s *Service) CreatePostEngagement(ctx context.Context, postType dPost.PostType, actionType dPost.ActionType, postID uuid.UUID) error {
@@ -132,7 +182,18 @@ func (s *Service) CreatePostEngagement(ctx context.Context, postType dPost.PostT
 		AssetType: postType,
 		UserID:    userID,
 		Type:      actionType,
+		CreatedAt: time.Now().UTC(),
 	})
+}
+
+// RemovePostEngagement takes back the requester's like or dislike on a post or comment.
+func (s *Service) RemovePostEngagement(ctx context.Context, postType dPost.PostType, assetID uuid.UUID) error {
+	userID, errParse := shared.ExtractUserID(ctx)
+	if errParse != nil {
+		return errParse
+	}
+
+	return s.postRepo.RemoveReaction(ctx, s.transactor.DB(), postType, assetID, userID)
 }
 
 /* ==================== Helper ====================== */

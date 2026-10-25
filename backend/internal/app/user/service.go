@@ -79,12 +79,13 @@ func (s *Service) UpdateUserPassword(ctx context.Context, userID uuid.UUID, oldP
 		return err
 	}
 
-	// Invalidate all sessions after changing password
-	if err = s.authRepo.InvalidateSessions(ctx, s.transactor.DB(), user.ID); err != nil {
-		return err
-	}
-
-	return s.userRepo.UpdateUserPassword(ctx, s.transactor.DB(), user.ID, string(hashedPassword))
+	// A new password ends every session, and either both happen or neither does
+	return s.transactor.WithTx(ctx, func(q database.Querier) error {
+		if err = s.userRepo.UpdateUserPassword(ctx, q, user.ID, string(hashedPassword)); err != nil {
+			return err
+		}
+		return s.authRepo.InvalidateSessions(ctx, q, user.ID)
+	})
 }
 
 func (s *Service) Delete(ctx context.Context, deleteType shared.DeleteType, userID uuid.UUID) error {
@@ -110,7 +111,11 @@ func (s *Service) Delete(ctx context.Context, deleteType shared.DeleteType, user
 	return s.transactor.WithTx(ctx, func(q database.Querier) error {
 		if deleteType == shared.DeleteSoft {
 			deleteNote.Type = dNote.TypeArchive
-			if err = s.userRepo.SoftDeleteUser(ctx, q, userID, nowUTC); err != nil {
+			if err = s.userRepo.SoftDeleteUser(ctx, q, targetUser.ID, nowUTC); err != nil {
+				return err
+			}
+			// A deleted account must not keep working through sessions it already has
+			if err = s.authRepo.InvalidateSessions(ctx, q, targetUser.ID); err != nil {
 				return err
 			}
 		} else if deleteType == shared.DeleteHard {

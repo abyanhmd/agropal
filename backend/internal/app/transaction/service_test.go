@@ -81,10 +81,6 @@ func (f *fakeUserRepository) DeleteUser(context.Context, database.Querier, uuid.
 	panic("fakeUserRepository: DeleteUser not stubbed")
 }
 
-func (f *fakeUserRepository) ListUsersByAsset(context.Context, database.Querier, shared.AssetType, uuid.UUID) ([]dUser.User, error) {
-	panic("fakeUserRepository: ListUsersByAsset not stubbed")
-}
-
 // fakeFarmRepository implements dFarm.Repository. FindFarmByID and
 // ListFarmByUserID are exercised by transaction.Service.
 type fakeFarmRepository struct {
@@ -272,12 +268,18 @@ func TestService_Create(t *testing.T) {
 			{Type: dTransaction.TypeExpense, Amount: 20},
 			{Type: dTransaction.TypeIncome, Amount: 30},
 		}
-		if err := svc.Create(ctxWithUser(ownerID), farmID, productID, cmds); err != nil {
+		ids, err := svc.Create(ctxWithUser(ownerID), farmID, productID, cmds)
+		if err != nil {
 			t.Fatalf("Create() error = %v, want nil", err)
 		}
 
 		if len(created) != 3 {
 			t.Fatalf("got %d created transactions, want 3", len(created))
+		}
+		for i, tx := range created {
+			if ids[i] != tx.ID {
+				t.Errorf("Create() ids[%d] = %v, want %v (the ids come back in the order sent)", i, ids[i], tx.ID)
+			}
 		}
 		seen := make(map[uuid.UUID]bool, 3)
 		for _, tx := range created {
@@ -308,7 +310,7 @@ func TestService_Create(t *testing.T) {
 		}
 		svc := NewService(fakeTransactor{}, userRepo, farmRepo, &fakeProductRepository{}, &fakeTransactionRepository{})
 
-		err := svc.Create(ctxWithUser(otherUserID), farmID, productID, []TransactionCommand{{Amount: 1}})
+		_, err := svc.Create(ctxWithUser(otherUserID), farmID, productID, []TransactionCommand{{Amount: 1}})
 		if !errors.Is(err, shared.ErrForbidden) {
 			t.Errorf("Create() error = %v, want %v", err, shared.ErrForbidden)
 		}

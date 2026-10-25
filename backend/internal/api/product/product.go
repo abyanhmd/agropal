@@ -26,12 +26,13 @@ func (h *Handler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = h.productService.CreateProduct(ctx, farmID, req.ToCommand()); err != nil {
+	productID, err := h.productService.CreateProduct(ctx, farmID, req.ToCommand())
+	if err != nil {
 		h.ioHandler.HandleServiceError(ctx, w, err)
 		return
 	}
 
-	h.ioHandler.WriteSuccess(ctx, w, dProduct.SuccessCreated, nil)
+	h.ioHandler.WriteSuccess(ctx, w, dProduct.SuccessCreated, response.ProductCreatedResponse{ProductID: productID})
 }
 
 func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {

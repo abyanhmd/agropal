@@ -5,6 +5,7 @@ import (
 	"agropal/internal/domain/shared"
 	"agropal/internal/infra/database"
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -33,8 +34,8 @@ func TestService_CreateProductPrice(t *testing.T) {
 		}
 		svc := NewService(fakeTransactor{}, &fakeUserRepository{}, &fakeFarmRepository{}, productRepo, &fakeNoteRepository{})
 
-		cmd := ProductPriceCommand{DateAdded: shared.Ptr(time.Now().UTC().Add(-time.Hour)), Price: shared.Ptr(19.99)}
-		if err := svc.CreateProductPrice(ctxWithUser(requesterID), farmID, productID, cmd); err != nil {
+		cmd := ProductPriceCommand{DateAdded: shared.Ptr(time.Now().UTC().Add(-time.Hour)), Price: shared.Ptr(19.99), Currency: shared.Ptr("USD")}
+		if _, err := svc.CreateProductPrice(ctxWithUser(requesterID), farmID, productID, cmd); err != nil {
 			t.Fatalf("CreateProductPrice() error = %v, want nil", err)
 		}
 		if added.ProductID != productID || added.Price != 19.99 {
@@ -62,8 +63,8 @@ func TestService_CreateProductPrice(t *testing.T) {
 		svc := NewService(fakeTransactor{}, &fakeUserRepository{}, &fakeFarmRepository{}, productRepo, &fakeNoteRepository{})
 
 		strangerID := uuid.New()
-		cmd := ProductPriceCommand{DateAdded: shared.Ptr(time.Now().UTC()), Price: shared.Ptr(1.0)}
-		if err := svc.CreateProductPrice(ctxWithUser(strangerID), farmID, productID, cmd); err != nil {
+		cmd := ProductPriceCommand{DateAdded: shared.Ptr(time.Now().UTC()), Price: shared.Ptr(1.0), Currency: shared.Ptr("USD")}
+		if _, err := svc.CreateProductPrice(ctxWithUser(strangerID), farmID, productID, cmd); err != nil {
 			t.Fatalf("CreateProductPrice() error = %v, want nil (no ownership check exists)", err)
 		}
 	})
@@ -77,8 +78,8 @@ func TestService_CreateProductPrice(t *testing.T) {
 		}
 		svc := NewService(fakeTransactor{}, &fakeUserRepository{}, &fakeFarmRepository{}, productRepo, &fakeNoteRepository{})
 
-		cmd := ProductPriceCommand{DateAdded: shared.Ptr(time.Now().UTC()), Price: shared.Ptr(1.0)}
-		err := svc.CreateProductPrice(ctxWithUser(requesterID), otherFarmID, productID, cmd)
+		cmd := ProductPriceCommand{DateAdded: shared.Ptr(time.Now().UTC()), Price: shared.Ptr(1.0), Currency: shared.Ptr("USD")}
+		_, err := svc.CreateProductPrice(ctxWithUser(requesterID), otherFarmID, productID, cmd)
 		if err == nil {
 			t.Fatal("CreateProductPrice() error = nil, want a farm/product mismatch error")
 		}
@@ -92,9 +93,23 @@ func TestService_CreateProductPrice(t *testing.T) {
 		}
 		svc := NewService(fakeTransactor{}, &fakeUserRepository{}, &fakeFarmRepository{}, productRepo, &fakeNoteRepository{})
 
-		cmd := ProductPriceCommand{DateAdded: shared.Ptr(time.Now().UTC()), Price: shared.Ptr(0.0)}
-		if err := svc.CreateProductPrice(ctxWithUser(requesterID), farmID, productID, cmd); err == nil {
+		cmd := ProductPriceCommand{DateAdded: shared.Ptr(time.Now().UTC()), Price: shared.Ptr(0.0), Currency: shared.Ptr("USD")}
+		if _, err := svc.CreateProductPrice(ctxWithUser(requesterID), farmID, productID, cmd); err == nil {
 			t.Fatal("CreateProductPrice() error = nil, want a non-positive-price error")
+		}
+	})
+
+	t.Run("rejects a missing currency", func(t *testing.T) {
+		productRepo := &fakeProductRepository{
+			findProductByIDFunc: func(context.Context, database.Querier, uuid.UUID) (dProduct.Product, error) {
+				return product, nil
+			},
+		}
+		svc := NewService(fakeTransactor{}, &fakeUserRepository{}, &fakeFarmRepository{}, productRepo, &fakeNoteRepository{})
+
+		cmd := ProductPriceCommand{DateAdded: shared.Ptr(time.Now().UTC().Add(-time.Hour)), Price: shared.Ptr(1.0)}
+		if _, err := svc.CreateProductPrice(ctxWithUser(requesterID), farmID, productID, cmd); !errors.Is(err, dProduct.ErrInvalidCurrency) {
+			t.Fatalf("CreateProductPrice() error = %v, want %v", err, dProduct.ErrInvalidCurrency)
 		}
 	})
 
@@ -106,8 +121,8 @@ func TestService_CreateProductPrice(t *testing.T) {
 		}
 		svc := NewService(fakeTransactor{}, &fakeUserRepository{}, &fakeFarmRepository{}, productRepo, &fakeNoteRepository{})
 
-		cmd := ProductPriceCommand{DateAdded: shared.Ptr(time.Now().UTC().Add(time.Hour)), Price: shared.Ptr(1.0)}
-		if err := svc.CreateProductPrice(ctxWithUser(requesterID), farmID, productID, cmd); err == nil {
+		cmd := ProductPriceCommand{DateAdded: shared.Ptr(time.Now().UTC().Add(time.Hour)), Price: shared.Ptr(1.0), Currency: shared.Ptr("USD")}
+		if _, err := svc.CreateProductPrice(ctxWithUser(requesterID), farmID, productID, cmd); err == nil {
 			t.Fatal("CreateProductPrice() error = nil, want a future-date error")
 		}
 	})
