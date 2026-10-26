@@ -30,9 +30,11 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            # One image at a time: building the Go and Next.js images together can run a small server out of memory
-            export COMPOSE_PARALLEL_LIMIT=1
-            docker compose -f docker-compose.prod.yaml build
+            # One image at a time: building the Go and Next.js images together runs a small server out of memory.
+            # COMPOSE_PARALLEL_LIMIT is ignored when compose builds through bake, so the services are named one by one.
+            for service in api email-worker migrate frontend; do
+              docker compose -f docker-compose.prod.yaml build "$service"
+            done
             docker compose -f docker-compose.prod.yaml up -d
 
             docker image prune -f

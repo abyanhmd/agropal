@@ -71,8 +71,9 @@ Do this once to prove the stack works before automating it.
 
 ```sh
 cd ~/agropal
-export COMPOSE_PARALLEL_LIMIT=1
-docker compose -f docker-compose.prod.yaml build
+for service in api email-worker migrate frontend; do
+  docker compose -f docker-compose.prod.yaml build "$service"
+done
 docker compose -f docker-compose.prod.yaml up -d
 docker compose -f docker-compose.prod.yaml ps
 docker compose -f docker-compose.prod.yaml logs -f api
