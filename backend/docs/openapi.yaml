@@ -95,7 +95,9 @@ paths:
       description: |
         Identify the account with `email` or with `username`, not both (400 if both are sent). An unknown
         account and a wrong password give the same `AUTH.INVALID_CREDENTIALS` answer.
-      description: Verifies email-or-username + password, then emails a one-time code. No token is issued here — call `/auth/login/verify` with the code.
+
+        Verifies email-or-username + password, then emails a one-time code. No token is issued here: call
+        `/auth/login/verify` with the code.
       security: []
       requestBody:
         required: true
