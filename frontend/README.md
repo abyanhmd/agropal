@@ -1,8 +1,8 @@
 # Agropal
 
 A farm management app: track products and their stock, record orders, check the weather for your fields, plan a
-crop calendar, and talk to other growers. This repository is the web app (Next.js). The REST API it talks to
-(Go, Postgres, Redis, RabbitMQ) lives in the backend repository.
+crop calendar, and talk to other growers. This folder is the web app (Next.js). The REST API it talks to
+(Go, Postgres, Redis, RabbitMQ) is in `../backend`.
 
 **Try it without an account:** open `/demo` (for example http://localhost:3000/demo). It shows a farm that has
 been used for a while, with sample data and stock photos, and nothing you do there is saved.
@@ -76,8 +76,8 @@ npm run dev
 
 Open http://localhost:3000. The landing page and `/demo` work with no backend at all.
 
-To sign in for real, start the API (the backend repository's README covers it, or run the whole stack with its
-`docker compose`), then create `.env.local`:
+To sign in for real, start the API (`../backend/README.md` covers it, or from the repo root run
+`docker compose up --build api email-worker`, which also starts its databases and the mail catcher), then create `.env.local`:
 
 ```sh
 NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1   # the default
@@ -93,7 +93,7 @@ NEXT_PUBLIC_MAPBOX_TOKEN=pk.…                      # optional: the location pi
 | `npm run lint` | ESLint |
 | `npx tsc --noEmit` | Type check |
 
-CI (`.github/workflows/ci.yml`) runs lint, the type check and a production build on every push and pull request.
+CI (`.github/workflows/frontend.yml` at the repo root) runs lint, the type check and a production build on pushes to `main` and on pull requests that touch `frontend/`. Production deploys are a separate workflow, `deploy.yml`.
 
 ## Photo credits
 

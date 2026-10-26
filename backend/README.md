@@ -7,6 +7,7 @@ Agropal is a backend platform for managing farms and farming activity: farms and
 - **Language:** Go 1.25
 - **Database:** PostgreSQL (`pgx/v5`, `lib/pq`, `sqlx`)
 - **Cache/Session:** Redis (holds staged registrations, one-time verification codes, and resend cooldowns for the auth flow)
+- **Queue:** RabbitMQ (the API publishes verification-email jobs; a separate worker in `cmd/email` sends them over SMTP)
 - **Auth:** JWT (`golang-jwt/jwt/v5`), AES-GCM-encrypted refresh tokens at rest
 - **Config:** Viper (`spf13/viper`) + `.env` (`godotenv`)
 - **Logging:** `rs/zerolog`
@@ -114,6 +115,10 @@ REDIS_PASSWORD=
 REDIS_DB=
 REDIS_PROTOCOL=
 
+RABBITMQ_ADDRESS=
+RABBITMQ_USERNAME=
+RABBITMQ_PASSWORD=
+
 SMTP_HOST=
 SMTP_PORT=
 SMTP_USERNAME=
@@ -122,6 +127,9 @@ SMTP_FROM=
 SECRET_JWT=
 SECRET_GCM_TOKEN=
 SECRET_SMTP=
+
+# Development only: returns one-time codes in API responses. Leave unset (false) anywhere real users sign up.
+EXPOSE_CODES=
 ```
 
 `SECRET_SMTP` is the SMTP account's password/app-password; `SMTP_USERNAME`/`SMTP_FROM` are usually the same address.
@@ -181,12 +189,12 @@ gofmt -l .
 go test ./...
 ```
 
-The same steps run in CI on every push and pull request against `master` (`.github/workflows/ci.yml`), with tests run under `-race`.
+The same steps run in CI (`.github/workflows/backend.yml` at the repo root) on pushes to `main` and on pull requests that touch `backend/`, with tests run under `-race`. The integration tests start Postgres, Redis and RabbitMQ with testcontainers, so they need Docker running. Production deploys are a separate workflow, `deploy.yml`.
 
 ## Domains
 
 - **Auth**: registration and login (both confirmed by a one-time code emailed to the user), refresh-token rotation (AES-GCM encrypted at rest), logout, password reset by emailed code
-- **User**: profile (name/avatar), password change, soft/hard delete, listing users by related asset
+- **User**: profile (name/avatar), password change, soft/hard delete, admin-only user listing
 - **Farm**: a user's farms
 - **Location**: weather-tracked locations (lat/long) attached to a farm
 - **Product**: a farm's products, with append-only price and stock history
@@ -195,5 +203,5 @@ The same steps run in CI on every push and pull request against `master` (`.gith
 
 ## Known Limitations
 
-- `boilerplate/*` is scaffolded but empty.
+- Integration tests (persistence, Redis, RabbitMQ) need Docker, so `go test ./...` fails on a machine without it; the unit tests under `internal/app`, `internal/api` and `config` do not.
 - `domain/note` is a write-only audit trail by design: users, products and posts record notes as they change, and nothing reads them back through the API. Add `app/note` and `api/note` if that is ever wanted.

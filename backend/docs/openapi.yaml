@@ -182,7 +182,7 @@ paths:
     post:
       tags: [Auth]
       summary: Rotate the token pair using the `rid` refresh cookie
-      description: Returns a new token pair in `data`. Note the `rid` cookie is not re-set by this endpoint.
+      description: Returns a new token pair in `data`. The `rid` cookie is re-set with the new refresh token id.
       security: []
       parameters:
         - name: rid
