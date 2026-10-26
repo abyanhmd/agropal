@@ -128,7 +128,7 @@ SECRET_SMTP=
 
 Server and path settings (host, port, migration/log paths) live in `backend/config/config.yaml`.
 
-If the server runs behind a reverse proxy (the docker-compose stack puts Traefik in front of it), set `server.trusted_proxies` in `config.yaml` to the proxy's IP ranges, for example `["172.16.0.0/12"]` for the compose bridge network. Rate limiting and request logging then read the real client IP from `X-Forwarded-For` instead of keying every request to the proxy. Left empty, the connection peer address is used as-is.
+If the server runs behind a reverse proxy (Caddy in the production stack), set `server.trusted_proxies` in `config.yaml` to the proxy's IP ranges, for example `["172.16.0.0/12"]` for the compose bridge network. Rate limiting and request logging then read the real client IP from `X-Forwarded-For` instead of keying every request to the proxy. Left empty, the connection peer address is used as-is. The production stack in the repo root (`docker-compose.prod.yaml`) sets this through `deploy/config.prod.yaml`.
 
 For browser (website) clients, list the front-end origins in `cors.allowed_origins` in `config.yaml`, for example `["https://app.example.com", "http://localhost:5173"]`. The `middleware.CORS` wrapper then answers preflight `OPTIONS` and sends `Access-Control-Allow-Origin`/`-Credentials` for those origins (credentials are on, since the auth flow uses the `rid` cookie), and exposes `X-Request-Id` to page scripts. The single entry `"*"` reflects any origin — development only. Native/mobile and server-to-server clients send no `Origin` header and are unaffected either way; an empty list simply blocks browser cross-origin calls.
 
@@ -163,12 +163,14 @@ go run ./cmd/email
 ### Running with Docker
 
 ```bash
-docker compose -f docker-compose-local.yaml up --build
+cd ..                       # the repo root
+cp .env.example .env
+docker compose up --build
 ```
 
-This builds and runs `go-api`, `go-migrate` (applies migrations once, then exits), `go-worker-email`, plus Postgres/Redis/RabbitMQ and a Traefik reverse proxy, all wired together on an internal Docker network. The api is reachable at `http://api.localhost` (routed through Traefik on port 80), RabbitMQ's management UI at `http://rabbitmq.localhost` or `localhost:15672`.
+The compose file in the repo root runs the whole app: the API, the migration job (applies migrations once, then exits), the email worker, the frontend, Postgres, Redis, RabbitMQ and a mail catcher, all on one Docker network. The API is at `http://localhost:8080/api/v1` and sign-in emails show up at `http://localhost:8025`. Production uses `docker-compose.prod.yaml` with Caddy in front; see the root README.
 
-`.env`'s `POSTGRES_HOST`/`REDIS_ADDRESS`/`RABBITMQ_ADDRESS` are written for running the binaries directly on the host (`go run`); the compose file overrides those three per-service to the in-network container names (`postgres`, `redis`, `rabbitmq`) so the containerized services can actually reach each other. If you add a new inter-service dependency, remember to add the matching override rather than relying on `.env`'s host values.
+`backend/.env`'s `POSTGRES_HOST`/`REDIS_ADDRESS`/`RABBITMQ_ADDRESS` are written for running the binaries directly on the host (`go run`); the compose files override those per-service to the in-network container names (`postgres`, `redis`, `rabbitmq`) so the containerized services can reach each other. If you add a new inter-service dependency, add the matching override there rather than relying on `backend/.env`'s host values.
 
 ### Build & verify
 

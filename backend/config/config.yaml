@@ -3,8 +3,8 @@ server:
   host: "0.0.0.0"
   port: 8080
   # CIDRs / IPs of reverse proxies allowed to set X-Forwarded-For. Leave
-  # empty when the server is reached directly. For the local docker-compose
-  # stack (Traefik) the proxy sits on the compose bridge network, e.g.:
+  # empty when the server is reached directly. In production (Caddy) the proxy
+  # sits on the compose bridge network, see deploy/config.prod.yaml, e.g.:
   # trusted_proxies: ["172.16.0.0/12"]
   trusted_proxies: []
 cors:
