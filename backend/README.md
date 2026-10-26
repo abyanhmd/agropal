@@ -93,7 +93,7 @@ Request bodies are validated with [go-playground/validator](https://github.com/g
 
 ### Prerequisites
 
-- Go 1.24+
+- Go 1.25+ (`go.mod` pins `go 1.25.7`)
 - PostgreSQL
 - Redis (the auth flow stores staged registrations and verification codes here, so the server needs it running)
 - RabbitMQ (the api publishes verification emails to it; run `cmd/email` to consume and send them)
