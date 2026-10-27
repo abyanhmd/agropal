@@ -124,10 +124,7 @@ func (s *Service) issueVerificationCode(ctx context.Context, purpose Verificatio
 		return "", dAuth.ErrRateLimited
 	}
 
-	verificationCode, err := s.generator.GenerateHexID()
-	if err != nil {
-		return "", err
-	}
+	verificationCode := s.generator.GenerateOTP()
 
 	record := verificationRecord{
 		CodeHash:  hashVerificationCode(verificationCode),
