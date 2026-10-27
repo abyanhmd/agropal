@@ -1,6 +1,84 @@
 # Agropal
 
-`backend/` is the Go API, `frontend/` is the Next.js app. This folder runs both together.
+A farm management app for small growers: products and stock, orders, weather, a crop calendar and a discussion board.
+
+**Live demo:** <!-- TODO: replace with the deployed URL -->https://agropal.dev/#demo (no account needed, nothing is saved)
+
+![Backend CI](https://github.com/abyanhmd/agropal/actions/workflows/backend.yml/badge.svg) ![Frontend CI](https://github.com/abyanhmd/agropal/actions/workflows/frontend.yml/badge.svg)
+
+![Dashboard](frontend/docs/screenshots/dashboard.png)
+
+| | |
+| --- | --- |
+| ![Products](frontend/docs/screenshots/products.png) | ![Crop calendar](frontend/docs/screenshots/calendar.png) |
+
+---
+
+## Stack and testing
+
+- **Backend:** Go with the standard library router, PostgreSQL with versioned migrations, Redis, RabbitMQ. The API is documented in [`backend/docs/openapi.yaml`](backend/docs/openapi.yaml).
+- **Frontend:** Next.js and TypeScript.
+- **Tests:** unit tests plus integration tests that run against real PostgreSQL, Redis and RabbitMQ containers. CI runs build, vet, gofmt and the race detector on every push.
+
+## Tests
+
+The Go backend has unit and integration tests. The integration tests start real Postgres, Redis and RabbitMQ
+containers with testcontainers, so Docker must be running.
+
+```sh
+cd backend
+go test ./... -race -count=1 -coverprofile=coverage.out
+go tool cover -func=coverage.out | tail -1    # total
+go tool cover -html=coverage.out              # per-line report in the browser
+```
+
+Backend statement coverage is **about 65%** overall (measured October 2026). The business-logic and HTTP layers sit
+mostly between 70% and 95%; the lower overall figure comes from untested wiring: the `cmd/` entrypoints, the container,
+the email sender and the database and queue connection helpers. The frontend has no automated tests yet; CI runs
+lint, type checking and a production build on it.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    User([Browser]) -->|HTTPS| Caddy
+    Caddy -->|/| Web[Next.js frontend]
+    Caddy -->|/api| API[Go API]
+    API --> PG[(Postgres)]
+    API --> Redis[(Redis)]
+    API -->|publish email task| MQ[[RabbitMQ]]
+    MQ -->|consume| Worker[Email worker]
+    Worker -->|SMTP| Mail([Email provider])
+```
+
+- **Caddy** terminates HTTPS and serves the app and the API from one origin.
+- **API** (Go) owns the business logic and stores its data in **Postgres**; **Redis** holds the short-lived email verification codes.
+- Sign-in and password-reset emails are queued on **RabbitMQ** and sent by a separate **worker**, so a slow mail provider never blocks a request.
+
+
+
+<!--
+## Decisions I made
+
+- **Go with no web framework.**
+I chose Go for its performance and its strict typing, which catches mistakes at compile time instead of in production. The API uses the standard library's `net/http` router and no web framework, because the standard library already does what this project needs and means fewer dependencies to maintain and understand.
+
+- **A queue and a worker for email, not sending inline.**
+I've seen what happens when an app sends email inside the request. The request took almost 10 seconds, because each email had to finish sending before the next one could start. In AgroPal the API publishes a task to RabbitMQ and returns straight away, and a separate worker sends the email. Sign-in stays fast even when the mail provider is slow, and the worker can be restarted or scaled without touching the API.
+
+- **Redis for verification codes.**
+One-time sign-in codes are short lived, so they belong in a store with built-in expiry. Codes expire after 10 minutes, there's a 60 second cooldown before another can be requested, and only a SHA-256 hash of the code is stored, so someone reading the cache can't read live codes. I also chose Redis now because I plan to add idempotency keys for safe request retries, and having it in the stack already makes that easier.
+
+- **Caddy as the single entry point.**
+Caddy sits in front of the app and the API on one domain, serves everything over HTTPS, and gets and renews its own certificates automatically. One origin also keeps the sign-in cookie first-party, so the API needs no CORS setup in production. Only ports 80 and 443 are open to the internet.
+
+- **Next.js for the frontend.**
+  Routing comes from the folder structure and the build pipeline is already configured, so there's less setup than a plain React project. It was also a good reason to learn a framework I hadn't used before.
+-->
+
+---
 
 ## Run everything
 
