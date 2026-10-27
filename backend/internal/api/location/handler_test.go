@@ -71,6 +71,7 @@ func (f *fakeUserRepository) SoftDeleteUser(context.Context, database.Querier, u
 func (f *fakeUserRepository) DeleteUser(context.Context, database.Querier, uuid.UUID) error {
 	panic("fakeUserRepository: DeleteUser not stubbed")
 }
+
 // fakeFarmRepository implements dFarm.Repository. Only FindFarmByID is
 // exercised by the location service.
 type fakeFarmRepository struct {

@@ -9,8 +9,8 @@ import (
 	"agropal/internal/infra/database"
 	"context"
 	"errors"
-	"testing"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/google/uuid"
@@ -85,16 +85,16 @@ func (f *fakeUserRepository) DeleteUser(context.Context, database.Querier, uuid.
 // post.Service actually calls are wired to a *Func field; everything else
 // panics if called.
 type fakePostRepository struct {
-	createPostFunc         func(ctx context.Context, q database.Querier, p dPost.Post) error
-	findPostByIDFunc       func(ctx context.Context, q database.Querier, id uuid.UUID) (dPost.Post, error)
-	listPostsFunc          func(ctx context.Context, q database.Querier, filter dPost.FilterQuery) ([]dPost.Post, error)
-	addCommentFunc         func(ctx context.Context, q database.Querier, c dPost.PostComment) error
-	countPostsFunc         func(ctx context.Context, q database.Querier, filter dPost.FilterQuery) (int, error)
-	findCommentByIDFunc    func(ctx context.Context, q database.Querier, id uuid.UUID) (dPost.PostComment, error)
-	listPostCommentsFunc   func(ctx context.Context, q database.Querier, postID uuid.UUID) ([]dPost.PostComment, error)
-	addEngagementFunc      func(ctx context.Context, q database.Querier, e dPost.PostEngagement) error
-	removeReactionFunc     func(ctx context.Context, q database.Querier, assetType dPost.PostType, assetID, userID uuid.UUID) error
-	listReactionsFunc      func(ctx context.Context, q database.Querier, userID, postID uuid.UUID) (map[uuid.UUID]dPost.ActionType, error)
+	createPostFunc       func(ctx context.Context, q database.Querier, p dPost.Post) error
+	findPostByIDFunc     func(ctx context.Context, q database.Querier, id uuid.UUID) (dPost.Post, error)
+	listPostsFunc        func(ctx context.Context, q database.Querier, filter dPost.FilterQuery) ([]dPost.Post, error)
+	addCommentFunc       func(ctx context.Context, q database.Querier, c dPost.PostComment) error
+	countPostsFunc       func(ctx context.Context, q database.Querier, filter dPost.FilterQuery) (int, error)
+	findCommentByIDFunc  func(ctx context.Context, q database.Querier, id uuid.UUID) (dPost.PostComment, error)
+	listPostCommentsFunc func(ctx context.Context, q database.Querier, postID uuid.UUID) ([]dPost.PostComment, error)
+	addEngagementFunc    func(ctx context.Context, q database.Querier, e dPost.PostEngagement) error
+	removeReactionFunc   func(ctx context.Context, q database.Querier, assetType dPost.PostType, assetID, userID uuid.UUID) error
+	listReactionsFunc    func(ctx context.Context, q database.Querier, userID, postID uuid.UUID) (map[uuid.UUID]dPost.ActionType, error)
 }
 
 func (f *fakePostRepository) CreatePost(ctx context.Context, q database.Querier, p dPost.Post) error {

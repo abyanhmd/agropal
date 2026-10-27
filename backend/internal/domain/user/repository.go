@@ -20,5 +20,4 @@ type Repository interface {
 
 	SoftDeleteUser(ctx context.Context, q database.Querier, userID uuid.UUID, deletedAt time.Time) error
 	DeleteUser(ctx context.Context, q database.Querier, userID uuid.UUID) error
-
 }

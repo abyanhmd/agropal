@@ -1,12 +1,12 @@
 package persistence
 
 import (
-	"time"
 	dAuth "agropal/internal/domain/auth"
 	"agropal/internal/domain/shared"
 	"agropal/internal/infra/database"
 	"agropal/pkg"
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )

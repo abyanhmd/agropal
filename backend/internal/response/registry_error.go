@@ -115,7 +115,7 @@ var ErrorRegistry = map[shared.ErrorKey]ResponseDetail{
 	dPost.ErrInvalidAuthorID:   {HTTPCode: 400, Message: "The author ID is invalid."},    // "POST.INVALID_AUTHOR_ID"
 	dPost.ErrInvalidAssetType:  {HTTPCode: 400, Message: "The asset type is invalid."},   // "POST.INVALID_ASSET_TYPE"
 	dPost.ErrInvalidActionType: {HTTPCode: 400, Message: "The action type is invalid."},  // "POST.INVALID_ACTION_TYPE"
-	dPost.ErrInvalidSort:       {HTTPCode: 400, Message: "The sort is invalid."},          // "POST.INVALID_SORT"
+	dPost.ErrInvalidSort:       {HTTPCode: 400, Message: "The sort is invalid."},         // "POST.INVALID_SORT"
 	dPost.ErrCreateFailed:      {HTTPCode: 500, Message: "Failed to create the post."},   // "POST.CREATE_FAILED"
 	dPost.ErrUpdateFailed:      {HTTPCode: 500, Message: "Failed to update the post."},   // "POST.UPDATE_FAILED"
 	dPost.ErrDeleteFailed:      {HTTPCode: 500, Message: "Failed to delete the post."},   // "POST.DELETE_FAILED"

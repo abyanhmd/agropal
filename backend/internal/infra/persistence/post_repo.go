@@ -1,13 +1,13 @@
 package persistence
 
 import (
-	"database/sql"
-	"errors"
 	dPost "agropal/internal/domain/post"
 	"agropal/internal/domain/shared"
 	"agropal/internal/infra/database"
 	"agropal/pkg"
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 

@@ -46,7 +46,7 @@ var SuccessRegistry = map[shared.SuccessKey]ResponseDetail{
 	dPost.SuccessCommentDeleted: {HTTPCode: 200, Message: "The comment was deleted successfully."}, // "POST.COMMENT_DELETE_SUCCESS"
 
 	dPost.SuccessEngagementCreated: {HTTPCode: 201, Message: "The engagement was recorded successfully."}, // "POST.ENGAGEMENT_CREATE_SUCCESS"
-	dPost.SuccessEngagementDeleted: {HTTPCode: 200, Message: "The reaction was removed successfully."},   // "POST.ENGAGEMENT_DELETE_SUCCESS"
+	dPost.SuccessEngagementDeleted: {HTTPCode: 200, Message: "The reaction was removed successfully."},    // "POST.ENGAGEMENT_DELETE_SUCCESS"
 
 	// PRODUCT
 	dProduct.SuccessCreated: {HTTPCode: 201, Message: "The product was created successfully."}, // "PRODUCT.CREATE_SUCCESS"

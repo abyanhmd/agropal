@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"agropal/config"
 	aAuth "agropal/internal/app/auth"
 	aFarm "agropal/internal/app/farm"
@@ -12,6 +11,7 @@ import (
 	aUser "agropal/internal/app/user"
 	dPost "agropal/internal/domain/post"
 	"agropal/internal/domain/shared"
+	"context"
 
 	dAuth "agropal/internal/domain/auth"
 	dFarm "agropal/internal/domain/farm"

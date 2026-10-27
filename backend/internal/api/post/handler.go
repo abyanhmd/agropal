@@ -1,9 +1,9 @@
 package post
 
 import (
+	"agropal/internal/api/middleware"
 	aPost "agropal/internal/app/post"
 	dPost "agropal/internal/domain/post"
-	"agropal/internal/api/middleware"
 	"agropal/internal/domain/shared"
 	"agropal/internal/request"
 	"agropal/internal/response"
